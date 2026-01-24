@@ -1,48 +1,59 @@
-import { title as homeTitle } from '@/app/layout.config';
-import { Section } from '@/components/section';
-import { TagCard } from '@/components/tags/tag-card';
-import { createMetadata } from '@/lib/metadata';
-import { getTags } from '@/lib/source';
-import { cn } from '@/lib/utils';
-import type { Metadata } from 'next';
+import type { Metadata } from 'next'
+import { Section } from '@/components/section'
+import { TagCard } from '@/components/tags/tag-card'
+import { ViewAnimation } from '@/components/view-animation'
+import { Wrapper } from '@/components/wrapper'
+import { title as homeTitle } from '@/constants/site'
+import { createMetadata } from '@/lib/metadata'
+import { getTags } from '@/lib/source'
+import { cn } from '@/lib/utils'
+import { Hero } from './_components/hero'
 
 export default function Page() {
-  const tags = getTags();
+  const tags = getTags()
 
   return (
-    <>
-      <Section className='p-4 lg:p-6'>
-        <h1 className='font-bold text-3xl leading-tight tracking-tighter md:text-4xl'>
-          Tags
-        </h1>
-      </Section>
+    <Wrapper>
+      <Hero />
       <Section className='h-full' sectionClassName='flex flex-1'>
-        <div className='grid grid-cols-1 divide-y divide-dashed divide-border/70 sm:grid-cols-2 lg:grid-cols-4 dark:divide-border'>
+        <div className='grid grid-cols-1 divide-y divide-dashed divide-border sm:grid-cols-2 lg:grid-cols-4'>
           {tags.map((tag, index) => (
-            <TagCard
+            <ViewAnimation
+              className='size-full'
+              delay={0.05 * index}
+              initial={{ opacity: 0 }}
               key={tag}
-              displayCount={true}
-              name={tag}
-              className={cn(
-                'items-center justify-start gap-2 rounded-none border-r-0 bg-card/50 p-6 last:border-border/70 last:border-b last:border-dashed hover:bg-card/80 last:dark:border-border',
-                tags.at(index - 1) && 'border-l',
-              )}
-            />
+              whileInView={{ opacity: 1 }}
+            >
+              <TagCard
+                className={cn(
+                  'size-full items-center justify-start gap-2 rounded-none border-r bg-card/50 p-6 hover:bg-card/80'
+                )}
+                displayCount={true}
+                name={tag}
+              />
+            </ViewAnimation>
           ))}
           {tags.length % 2 === 1 && (
-            <div className='size-full border-border/70 border-dashed bg-dashed sm:border-b sm:border-l dark:border-border' />
+            <ViewAnimation
+              delay={0.05 * tags.length}
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+            >
+              <div className='size-full border-border border-dashed bg-dashed sm:border-b' />
+            </ViewAnimation>
           )}
         </div>
       </Section>
-    </>
-  );
+    </Wrapper>
+  )
 }
 
 export async function generateMetadata(props: {
-  params: Promise<{ slug?: string[] }>;
+  params: Promise<{ slug?: string[] }>
 }): Promise<Metadata> {
-  const params = await props.params;
-  const description = `Explore all the tags on ${homeTitle}.`;
+  const _params = await props.params
+  const description = `Explore all the tags on ${homeTitle}.`
 
   return createMetadata({
     title: 'Tags',
@@ -53,5 +64,5 @@ export async function generateMetadata(props: {
     alternates: {
       canonical: '/tags',
     },
-  });
+  })
 }

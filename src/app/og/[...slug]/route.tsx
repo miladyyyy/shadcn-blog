@@ -1,58 +1,37 @@
-import { generateOGImage } from '@/app/og/[...slug]/og';
-import { metadataImage } from '@/lib/metadata-image';
-import type { ImageResponse } from 'next/og';
+import { ImageResponse } from '@takumi-rs/image-response'
+import { getBlogPageImage } from '@/lib/metadata'
+import { getLocalImageDataUrl } from '@/lib/og'
+import { getPost, getPosts } from '@/lib/source'
+import { generate, getImageResponseOptions } from './og'
 
-async function loadAssets(): Promise<
-  { name: string; data: Buffer; weight: 400 | 600; style: 'normal' }[]
-> {
-  const [
-    { base64Font: normal },
-    { base64Font: mono },
-    { base64Font: semibold },
-  ] = await Promise.all([
-    import('./fonts/geist-regular-otf.json').then((mod) => mod.default || mod),
-    import('./fonts/geistmono-regular-otf.json').then(
-      (mod) => mod.default || mod,
-    ),
-    import('./fonts/geist-semibold-otf.json').then((mod) => mod.default || mod),
-  ]);
+export const GET = async (
+  _request: Request,
+  context: { params: Promise<{ slug?: string[] }> }
+): Promise<ImageResponse | Response> => {
+  const params = await context.params
+  const slug = params.slug ?? []
+  const page = getPost(slug.slice(0, -1))
 
-  return [
-    {
-      name: 'Geist',
-      data: Buffer.from(normal, 'base64'),
-      weight: 400 as const,
-      style: 'normal' as const,
-    },
-    {
-      name: 'Geist Mono',
-      data: Buffer.from(mono, 'base64'),
-      weight: 400 as const,
-      style: 'normal' as const,
-    },
-    {
-      name: 'Geist',
-      data: Buffer.from(semibold, 'base64'),
-      weight: 600 as const,
-      style: 'normal' as const,
-    },
-  ];
+  if (!page) {
+    return new Response('Not Found', { status: 404 })
+  }
+
+  const backgroundImage = await getLocalImageDataUrl(page.data.image)
+
+  return new ImageResponse(
+    generate({
+      title: page.data.title ?? 'Untitled',
+      description: page.data.description ?? '',
+      backgroundImage,
+    }),
+    await getImageResponseOptions()
+  )
 }
 
-export const GET = metadataImage.createAPI(
-  async (page): Promise<ImageResponse> => {
-    const [fonts] = await Promise.all([loadAssets()]);
-
-    return generateOGImage({
-      title: page.data.title,
-      description: page.data.description,
-      fonts,
-    });
-  },
-);
-
 export function generateStaticParams(): {
-  slug: string[];
+  slug: string[]
 }[] {
-  return metadataImage.generateParams();
+  return getPosts().map((page) => ({
+    slug: getBlogPageImage(page).segments,
+  }))
 }
