@@ -43,7 +43,7 @@ export function Provider({
           }}
           replace={router.replace}
           social={{
-            providers: ['google'],
+            providers: ['github', 'google'],
           }}
           viewPaths={{
             SIGN_IN: 'login',
