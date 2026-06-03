@@ -35,10 +35,7 @@ cp .env.example .env
 ```
 
 Required variables:
-- `DATABASE_URL`: Neon PostgreSQL connection string
-- `BETTER_AUTH_SECRET`: Auth secret key
-- `BETTER_AUTH_URL`: Your app URL
-- `RESEND_API_KEY`: For newsletter emails
+No environment variables are required to build the site. Configure Resend variables only if you want to enable newsletter subscriptions.
 
 ### Development
 
@@ -56,8 +53,6 @@ Open [http://localhost:3000](http://localhost:3000) to see your blog.
 - `pnpm check`: Run Biome linter
 - `pnpm check:write`: Auto-fix linting issues
 - `pnpm typecheck`: Run TypeScript type checking
-- `pnpm db:push`: Push database schema changes
-- `pnpm db:studio`: Open Drizzle Studio
 
 ## Project Structure
 
@@ -71,7 +66,6 @@ Open [http://localhost:3000](http://localhost:3000) to see your blog.
 │   ├── app/            # Next.js app directory
 │   │   ├── (home)/     # Main site routes
 │   │   │   └── (blog)/ # Blog routes
-│   │   ├── (auth)/     # Authentication pages
 │   │   ├── (llms)/     # LLM-readable content
 │   │   └── api/        # API routes
 │   ├── components/     # React components
@@ -80,10 +74,6 @@ Open [http://localhost:3000](http://localhost:3000) to see your blog.
 │   │   └── blog/       # Blog-specific components
 │   ├── constants/      # App constants
 │   ├── lib/            # Utilities and helpers
-│   ├── server/         # Server-side code
-│   │   ├── auth/       # Authentication
-│   │   ├── comments/   # Comment system
-│   │   └── db/         # Database
 │   └── styles/         # Global styles
 └── source.config.ts    # Fumadocs configuration
 ```
@@ -120,8 +110,6 @@ Your content here...
 - **Styling**: [Tailwind CSS 4](https://tailwindcss.com/)
 - **UI Components**: [shadcn/ui](https://ui.shadcn.com/)
 - **Content**: [Fumadocs](https://fumadocs.vercel.app/)
-- **Database**: [Drizzle ORM](https://orm.drizzle.team/) + [Neon](https://neon.tech/)
-- **Authentication**: [Better Auth](https://www.better-auth.com/)
 - **Email**: [Resend](https://resend.com/)
 - **Linting**: [Biome](https://biomejs.dev/)
 

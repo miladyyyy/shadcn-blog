@@ -1,4 +1,3 @@
-import { UserButton } from '@daveyplate/better-auth-ui'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { ViewAnimation } from '@/components/view-animation'
 import { owner } from '@/constants/site'
@@ -14,23 +13,10 @@ export const Footer = () => (
     )}
   >
     <Links />
-    <div className='grid items-center gap-4 sm:grid-cols-3'>
-      <ViewAnimation
-        className='w-min'
-        delay={0.1}
-        initial={{ opacity: 0, translateY: -6 }}
-        whileInView={{ opacity: 1, translateY: 0 }}
-      >
-        <UserButton
-          align='start'
-          className='rounded-md'
-          sideOffset={10}
-          size='icon'
-        />
-      </ViewAnimation>
-      <div className='flex items-center sm:justify-center'>
+    <div className='grid items-center gap-4 sm:grid-cols-2'>
+      <div className='flex items-center'>
         <ViewAnimation
-          delay={0.15}
+          delay={0.1}
           initial={{ opacity: 0, translateY: -6 }}
           whileInView={{ opacity: 1, translateY: 0 }}
         >
@@ -41,7 +27,7 @@ export const Footer = () => (
       </div>
       <ViewAnimation
         className='flex items-center gap-2 sm:justify-end'
-        delay={0.2}
+        delay={0.15}
         initial={{ opacity: 0, translateY: -6 }}
         whileInView={{ opacity: 1, translateY: 0 }}
       >

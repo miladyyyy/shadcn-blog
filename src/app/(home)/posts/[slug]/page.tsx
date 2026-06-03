@@ -11,7 +11,7 @@ import { description as homeDescription } from '@/constants/site'
 import { createMetadata, getBlogPageImage } from '@/lib/metadata'
 import { getPost, getPosts } from '@/lib/source'
 import { Header } from './_components/header'
-import { PostComments, Share } from './page.client'
+import { Share } from './page.client'
 
 export default async function Page(props: {
   params: Promise<{ slug: string }>
@@ -54,10 +54,6 @@ export default async function Page(props: {
                 }}
               />
             </div>
-            <PostComments
-              className='[&_form>div]:!rounded-none rounded-none border-0 border-border border-t border-dashed'
-              slug={params.slug}
-            />
           </div>
           <div className='flex flex-col gap-4 p-4 text-sm lg:sticky lg:top-[4rem] lg:h-[calc(100vh-4rem)] lg:w-[250px] lg:self-start lg:overflow-y-auto lg:border-border lg:border-l lg:border-dashed'>
             <div>

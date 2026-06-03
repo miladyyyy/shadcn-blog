@@ -9,27 +9,12 @@ export const env = createEnv({
   },
 
   server: {
-    // Database
-    DATABASE_URL: z.string().url(),
     // Resend
-    RESEND_API_KEY: z.string().min(1).startsWith('re_'),
-    RESEND_AUDIENCE_ID: z.string().min(1),
-    EMAIL_FROM: z.email(),
-    EMAIL_TO: z.email(),
-    // Authentication
-    BETTER_AUTH_SECRET:
-      process.env.NODE_ENV === 'production'
-        ? z.string().min(1)
-        : z.string().min(1).optional(),
-    BETTER_AUTH_URL: z.string().min(1).optional(),
+    RESEND_API_KEY: z.string().min(1).startsWith('re_').optional(),
+    RESEND_AUDIENCE_ID: z.string().min(1).optional(),
+    EMAIL_FROM: z.email().optional(),
     // BotID
     BOTID_DEV_BYPASS: z.enum(['BAD-BOT', 'GOOD-BOT', 'HUMAN']).optional(),
-    // Google
-    GOOGLE_CLIENT_ID: z.string().min(1),
-    GOOGLE_CLIENT_SECRET: z.string().min(1),
-    // Github
-    GITHUB_CLIENT_ID: z.string().min(1),
-    GITHUB_CLIENT_SECRET: z.string().min(1),
   },
 
   client: {

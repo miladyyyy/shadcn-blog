@@ -7,10 +7,8 @@ import { ActionError, actionClient } from '@/lib/safe-action/client'
 import { botIdMiddleware } from '@/lib/safe-action/middleware'
 import { getSortedByDatePosts } from '@/lib/source'
 import { NewsletterSchema } from '@/lib/validators'
-import { getSession } from '@/server/auth'
 
 const resend = new Resend(env.RESEND_API_KEY)
-const audienceId = env.RESEND_AUDIENCE_ID
 
 const splitName = (name = '') => {
   const [firstName, ...lastName] = name.split(' ').filter(Boolean)
@@ -24,11 +22,13 @@ export const subscribe = actionClient
   .use(botIdMiddleware)
   .inputSchema(NewsletterSchema)
   .action(async ({ parsedInput: { email } }) => {
-    const session = await getSession()
-    const fullName = session?.user.name || ''
-    const { firstName, lastName } = fullName
-      ? splitName(fullName)
-      : { firstName: '', lastName: '' }
+    const audienceId = env.RESEND_AUDIENCE_ID
+
+    if (!(env.RESEND_API_KEY && audienceId && env.EMAIL_FROM)) {
+      throw new ActionError('Newsletter email service is not configured.')
+    }
+
+    const { firstName, lastName } = splitName()
 
     try {
       const contact = await getContact({ email, audienceId })

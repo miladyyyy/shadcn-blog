@@ -1,7 +1,5 @@
 'use client'
-import { useAuthenticate } from '@daveyplate/better-auth-ui'
-import { Comments } from '@fuma-comment/react'
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { toast } from 'sonner'
 import { useCopyToClipboard } from 'usehooks-ts'
 import {
@@ -41,32 +39,5 @@ export function Share({
       <ShareIcon className='size-4 hover:bg-transparent' ref={iconRef} />
       {label}
     </Button>
-  )
-}
-
-export function PostComments({
-  slug,
-  className,
-}: {
-  slug: string
-  className?: string
-}) {
-  const [authenticate, setAuthenticate] = useState(false)
-
-  useAuthenticate({
-    enabled: authenticate,
-  })
-
-  return (
-    <Comments
-      auth={{
-        type: 'api',
-        signIn: () => {
-          setAuthenticate(true)
-        },
-      }}
-      className={cn('w-full', className)}
-      page={slug}
-    />
   )
 }

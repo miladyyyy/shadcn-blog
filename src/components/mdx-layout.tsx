@@ -1,22 +1,17 @@
 import { InlineTOC } from 'fumadocs-ui/components/inline-toc'
 import type { ComponentProps, ReactNode } from 'react'
-import { PostComments } from '@/app/(home)/posts/[slug]/page.client'
 import { Section } from './section'
 
 interface MdxLayoutProps {
   children: ReactNode
   title: string
   toc?: ComponentProps<typeof InlineTOC>['items']
-  comments?: boolean
-  slug: string
 }
 
 export default function MdxLayout({
   children,
   title,
   toc,
-  comments,
-  slug,
 }: MdxLayoutProps): ReactNode {
   return (
     <>
@@ -38,14 +33,7 @@ export default function MdxLayout({
               <div className='py-2' />
             )}
             <div className='prose min-w-0 flex-1 px-4'>{children}</div>
-            {comments ? (
-              <PostComments
-                className='[&_form>div]:!rounded-none rounded-none border-0 border-border border-t border-dashed'
-                slug={slug}
-              />
-            ) : (
-              <div className='py-2' />
-            )}
+            <div className='py-2' />
           </div>
         </article>
       </Section>

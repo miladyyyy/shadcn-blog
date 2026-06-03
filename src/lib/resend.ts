@@ -61,7 +61,7 @@ export async function sendWelcomeEmail({
 }) {
   const EMAIL_FROM = env.EMAIL_FROM
 
-  if (!(firstName && to)) {
+  if (!(EMAIL_FROM && firstName && to)) {
     throw new Error('Missing required email fields')
   }
 
