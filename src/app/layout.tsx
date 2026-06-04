@@ -79,17 +79,11 @@ const jsonLd = {
   ],
 }
 
-const RootLayout = ({
-  locale,
-  children,
-}: {
-  locale: string
-  children: ReactNode
-}) => {
+const RootLayout = ({ children }: { children: ReactNode }) => {
   return (
     <html
       className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      lang='en'
+      lang='zh-CN'
       suppressHydrationWarning
     >
       <head>
@@ -115,7 +109,7 @@ const RootLayout = ({
           type='application/ld+json'
         />
         <RootProvider
-          i18n={i18nProvider(translations, locale)}
+          i18n={i18nProvider(translations)}
           search={{
             SearchDialog: CustomSearchDialog,
           }}
