@@ -110,7 +110,7 @@
     "react-email": "^5.2.11",
     "tailwindcss": "4.3.0",
     "tsx": "^4.22.4",
-    "typescript": "5.9.3",
+    "typescript": "6.0.3",
     "ultracite": "7.0.12"
   },
   "overrides": {
