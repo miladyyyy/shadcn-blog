@@ -1,0 +1,97 @@
+---
+title: "Vue 3.6：Vapor Mode（蒸汽模式）开启无虚拟 DOM 时代"
+description: Vue 3.6 的 Vapor Mode 允许你跳过虚拟 DOM，直接操作真实 DOM。你只需添加一个简单的标记，就能获得巨大的速度提升和更小的打包体积。以下是它的工作原理。.
+date: 2025-06-01
+tags: ['vue']
+image: /images/blog/first-post.png
+author: You
+---
+
+## 为什么会出现虚拟 DOM
+
+浏览器允许你通过操作 DOM 树来修改页面。早期的框架是手动进行这些操作的，但这变得既慢又容易出错。虚拟 DOM（VDOM）由此诞生，旨在缓解这一问题。它在内存中保留了一份轻量级的 DOM 副本。当数据发生变化时，框架会：
+1. 渲染一棵新的虚拟树
+2. 将其与旧树进行对比（diff 算法）
+3. 计算出最小的 DOM 更新
+4. 执行这些更新
+
+这免去了你手动操作 DOM 的麻烦，并将多次更新合并为一次。但是，创建和对比虚拟树会消耗 CPU 和内存。Vue 3 引入了编译器技巧（如静态提升、静态标记 patch flags）来减少大部分无用功，但在运行时它仍然需要构建和对比 VDOM 节点
+## Vapor Mode 的工作原理
+
+Vapor Mode 在运行时跳过了 VDOM。编译器会将你的 `template` 直接转换为操作真实 DOM 的更新代码。它不再创建 VNode 对象并进行对比，而是生成具有以下功能的函数：
+- 创建真实 DOM 节点
+- 精确追踪哪些部分依赖于哪个响应式值
+- 当该值发生变化时，仅更新受影响的节点
+
+在实际开发过程中，我们不需要改变任何代码，只需在组件上添加一个简单的标记：
+
+```vue
+<script setup vapor>
+import { ref } from 'vue'
+const count = ref(0)
+</script>
+
+<template>
+  <button @click="count++"> Count: {{ count }} </button>
+</template>
+```
+
+使用了 vapor 标记后，Vue 编译器输出的代码类似于：
+
+```js
+// 创建 <button>，设置文本和点击事件处理器
+// 追踪 count，以便在变化时仅更新文本节点
+```
+
+这移除了 VNode 的创建和 diff 对比过程。它利用 Vue 的响应式系统（Proxy + 依赖追踪）来仅运行你需要的更新函数。这意味着需要解析的 JS 更少、持有节点所需的内存更小，且更新速度更快。
+
+## 性能提升
+在官方测试中，Vapor Mode 展现出了巨大的优势：
+
+| 指标 | VDOM | Vapor |
+| --- | --- | --- |
+| 打包体积（Hello World 项目） | 22.8 kB | 7.9 kB（减少 65%） |
+| 复杂列表对比（Diff） | 基准（1倍速） | 1.66倍速（快了约 40%） |
+| 内存峰值 | 100% | 58%（降低 42%） |
+
+**简而言之**：首屏加载的 JS 体积减少了三分之二，运行时内存几乎减半。
+
+## 如何使用 Vapor Mode
+1. **启用方式**
+```js
+<script setup vapor>
+// 你的代码
+</script>
+```
+2. **Options API**：目前尚不支持
+3. **自定义指令**
+```js
+const MyDirective = (el, valueGetter) => {
+  watchEffect(() => {
+    el.textContent = valueGetter()
+  })
+  return () => console.log('卸载时清理')
+}
+```
+4. **与 UI 组件库互集成**：使用 `vaporInteropPlugin` 可以将 Vapor 与 Element Plus 或 Ant Design Vue 混合使用。标准的 props、events 和 slots 都可以正常工作。复杂场景仍需测试。
+5. **createVaporApp**：新项目可以从零 VDOM 运行时开始构建
+```bash
+npm init vue@latest --template vapor
+```
+## 何时采用（“三用三不用”）
+- ✅ **用在**对性能极其敏感的模块（如首页、落地页）
+- ✅ **用在**带有 `createVaporApp` 的新项目
+- ✅ **用在**内部测试：提交 Issue、运行测试，帮助完善生态
+- ❌ **不用在**一次性迁移整个老旧项目（API 仍在调整中）
+- ❌ **不用在**极度依赖 Nuxt SSR、`<Transition>`、`<KeepAlive>` 的地方
+- ❌ **不用在**未加防范地混合嵌套过深的 VDOM 库
+
+## 开发者最关心的问题
+1. **我需要重写旧代码吗？**
+不需要。只需在 `<script setup>` 中添加 `vapor` 属性即可。模板和 `setup` 逻辑保持不变。
+2. **自定义指令怎么办？**
+使用新的 getter 接口并返回清理函数。
+3. **支持 TypeScript 吗？**
+完全支持。类型会自动推导。Vue 在 `@vue/runtime-core` 中添加了 `VaporComponent` 类型，无需额外配置。
+4. **它与 React 的 Concurrent Mode 或 Angular 的 Signals 相比如何？**
+在基准测试中，Vapor 的速度与 Solid 或 Svelte 旗鼓相当。它的核心优势在于迁移成本极低——只需切换一个标签标记。
