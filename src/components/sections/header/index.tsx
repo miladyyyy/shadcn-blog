@@ -16,7 +16,6 @@ import type { HomeLayoutProps } from 'fumadocs-ui/layouts/home'
 import {
   type LinkItemType,
   type NavOptions,
-  renderTitleNav,
   resolveLinkItems,
 } from 'fumadocs-ui/layouts/shared'
 import { useIsScrollTop } from 'fumadocs-ui/utils/use-is-scroll-top'
@@ -28,6 +27,15 @@ import { cn } from '@/lib/utils'
 import { LinkItem } from './link-item'
 import { LargeSearchToggle, SearchToggle } from './search-toggle'
 import { ThemeToggle } from './theme-toggle'
+
+type HeaderNavOptions = NavOptions & {
+  enableHoverToOpen?: boolean
+}
+
+type HeaderProps = Omit<HomeLayoutProps, 'nav'> & {
+  className?: string
+  nav?: HeaderNavOptions
+}
 
 const navItemVariants = cva('[&_svg]:size-4', {
   variants: {
@@ -55,7 +63,7 @@ export const Header = ({
   themeSwitch = {},
   searchToggle = {},
   className,
-}: HomeLayoutProps & { className?: string }) => {
+}: HeaderProps) => {
   const { navItems, menuItems } = useMemo(() => {
     const navItems: LinkItemType[] = []
     const menuItems: LinkItemType[] = []
@@ -88,9 +96,10 @@ export const Header = ({
             initial={{ opacity: 0, translateY: -6 }}
             whileInView={{ opacity: 1, translateY: 0 }}
           >
-            {renderTitleNav(nav, {
-              className: 'inline-flex items-center gap-2.5 font-semibold',
-            })}
+            <NavTitle
+              className='inline-flex items-center gap-2.5 font-semibold'
+              nav={nav}
+            />
           </ViewAnimation>
           {nav.children}
         </div>
@@ -208,6 +217,23 @@ export const Header = ({
         </NavigationMenuItem>
       </ul>
     </HeaderNavigationMenu>
+  )
+}
+
+const NavTitle = ({
+  nav,
+  ...props
+}: ComponentProps<'a'> & { nav: HeaderNavOptions }) => {
+  const { title: Title, url = '/' } = nav
+
+  if (typeof Title === 'function') {
+    return <Title href={url} {...props} />
+  }
+
+  return (
+    <Link href={url} {...props}>
+      {Title}
+    </Link>
   )
 }
 

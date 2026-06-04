@@ -10,6 +10,8 @@ import { description as homeDescription, owner, title } from '@/constants/site'
 import { createMetadata } from '@/lib/metadata'
 import '@/styles/globals.css'
 import 'katex/dist/katex.css'
+import { i18nProvider } from 'fumadocs-ui/i18n'
+import { translations } from '@/lib/layout.shared'
 import { Body } from './layout.client'
 import { Provider } from './provider'
 
@@ -77,7 +79,13 @@ const jsonLd = {
   ],
 }
 
-const RootLayout = ({ children }: { children: ReactNode }) => {
+const RootLayout = ({
+  locale,
+  children,
+}: {
+  locale: string
+  children: ReactNode
+}) => {
   return (
     <html
       className={`${geistSans.variable} ${geistMono.variable} antialiased`}
@@ -107,6 +115,7 @@ const RootLayout = ({ children }: { children: ReactNode }) => {
           type='application/ld+json'
         />
         <RootProvider
+          i18n={i18nProvider(translations, locale)}
           search={{
             SearchDialog: CustomSearchDialog,
           }}

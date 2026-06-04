@@ -5,14 +5,8 @@ import { BlurImage } from '@/components/blur-image'
 import { Section } from '@/components/section'
 import { TagCard } from '@/components/tags/tag-card'
 import { ViewAnimation } from '@/components/view-animation'
+import { formatChineseDate } from '@/lib/format-date'
 import type { BlogPage as MDXPage } from '@/lib/source'
-
-const formatPostDate = (date: Date) =>
-  date.toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  })
 
 interface HeaderProps {
   page: MDXPage
@@ -21,7 +15,7 @@ interface HeaderProps {
 
 export const Header = ({ page, tags }: HeaderProps) => {
   const image = page.data.image
-  const formattedDate = formatPostDate(page.data.date)
+  const formattedDate = formatChineseDate(page.data.date)
 
   return (
     <Section>

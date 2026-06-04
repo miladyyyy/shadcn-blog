@@ -1,4 +1,4 @@
-import { CalendarIcon, UserIcon } from 'lucide-react'
+import { CalendarIcon } from 'lucide-react'
 import Link from 'next/link'
 import type React from 'react'
 import { ViewTransition } from 'react'
@@ -11,7 +11,6 @@ interface PostCardProps {
   image?: string | null
   url: string
   date: string
-  author: string
   tags?: string[]
   slugs: string[]
   index?: number
@@ -23,7 +22,6 @@ export const PostCard: React.FC<PostCardProps> = ({
   image,
   url,
   date,
-  author,
   tags: _tags,
   slugs,
   index: _index,
@@ -48,11 +46,6 @@ export const PostCard: React.FC<PostCardProps> = ({
         </div>
         <div className='flex flex-col justify-center gap-4'>
           <div className='group inline-flex items-center gap-2 text-muted-foreground text-sm'>
-            <span className='inline-flex items-center gap-1 capitalize'>
-              <UserIcon className='size-4 transition-transform hover:scale-125' />
-              {author}
-            </span>
-            <span>•</span>
             <span className='inline-flex items-center gap-1'>
               <CalendarIcon className='size-4 transition-transform hover:scale-125' />
               {date}

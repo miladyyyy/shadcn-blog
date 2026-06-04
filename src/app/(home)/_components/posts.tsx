@@ -4,6 +4,7 @@ import { Icons } from '@/components/icons/icons'
 import { Section } from '@/components/section'
 import { buttonVariants } from '@/components/ui/button'
 import { ViewAnimation } from '@/components/view-animation'
+import { formatChineseDate } from '@/lib/format-date'
 import type { BlogPage } from '@/lib/source'
 
 export default function Posts({ posts }: { posts: BlogPage[] }) {
@@ -11,7 +12,7 @@ export default function Posts({ posts }: { posts: BlogPage[] }) {
     <Section>
       <div className='grid divide-y divide-dashed divide-border/70 text-left dark:divide-border'>
         {posts.map((post, index) => {
-          const date = new Date(post.data.date).toDateString()
+          const date = formatChineseDate(post.data.date)
           return (
             <ViewAnimation
               delay={0.05 * index}
@@ -20,7 +21,6 @@ export default function Posts({ posts }: { posts: BlogPage[] }) {
               whileInView={{ opacity: 1, translateY: 0 }}
             >
               <PostCard
-                author={post.data.author}
                 date={date}
                 description={post.data.description ?? ''}
                 image={post.data.image}

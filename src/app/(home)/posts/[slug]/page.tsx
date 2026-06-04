@@ -8,6 +8,7 @@ import BlogProgressBar from '@/components/blog/progress-bar'
 import { PostJsonLd } from '@/components/json-ld'
 import { Section } from '@/components/section'
 import { description as homeDescription } from '@/constants/site'
+import { formatChineseDate } from '@/lib/format-date'
 import { createMetadata, getBlogPageImage } from '@/lib/metadata'
 import { getPost, getPosts } from '@/lib/source'
 import { Header } from './_components/header'
@@ -57,23 +58,15 @@ export default async function Page(props: {
           </div>
           <div className='flex flex-col gap-4 p-4 text-sm lg:sticky lg:top-[4rem] lg:h-[calc(100vh-4rem)] lg:w-[250px] lg:self-start lg:overflow-y-auto lg:border-border lg:border-l lg:border-dashed'>
             <div>
-              <p className='mb-1 text-fd-muted-foreground'>Written by</p>
-              <p className='font-medium'>{page.data.author ?? 'Unknown'}</p>
-            </div>
-            <div>
-              <p className='mb-1 text-fd-muted-foreground text-sm'>
-                Created At
-              </p>
-              <p className='font-medium'>
-                {new Date(page.data.date).toDateString()}
-              </p>
+              <p className='mb-1 text-fd-muted-foreground text-sm'>发布时间</p>
+              <p className='font-medium'>{formatChineseDate(page.data.date)}</p>
             </div>
             {lastUpdate && (
               <div>
                 <p className='mb-1 text-fd-muted-foreground text-sm'>
-                  Updated At
+                  上次更新
                 </p>
-                <p className='font-medium'>{lastUpdate.toDateString()}</p>
+                <p className='font-medium'>{formatChineseDate(lastUpdate)}</p>
               </div>
             )}
             <Share url={page.url} />

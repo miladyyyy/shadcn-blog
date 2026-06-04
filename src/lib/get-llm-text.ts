@@ -1,5 +1,5 @@
-import { format } from 'date-fns'
 import { owner, repo } from '@/constants/config'
+import { formatChineseDate } from '@/lib/format-date'
 import type { BlogPage } from '@/lib/source'
 
 type ContentPage = BlogPage
@@ -47,7 +47,7 @@ ${page.data.description ?? ''}
 
 ${processed}
 
-${page.data.lastModified ? `Last updated on ${format(new Date(page.data.lastModified), 'MMMM d, yyyy')}` : ''}`
+${page.data.lastModified ? `最后更新于 ${formatChineseDate(page.data.lastModified)}` : ''}`
 }
 
 export async function getBlogLLMText(
