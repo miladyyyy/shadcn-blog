@@ -1,0 +1,411 @@
+---
+title: "Golang context 包使用指南：取消、超时和值传递"
+description: "context 是 Go 并发和服务端编程里最常见的基础设施之一。本文用实际代码讲清楚它如何传递取消信号、控制超时、保存请求级数据，以及在项目中应该遵守哪些边界。"
+date: 2026-06-06
+tags: ['golang', 'context']
+image: /images/blog/markdown-examples.png
+author: You
+---
+
+`context` 是 Go 标准库里一个很小、但影响非常大的包。它解决的不是“怎么启动 goroutine”，而是另一个更容易被忽略的问题：**当一个请求已经结束、超时或被取消时，相关的工作应该如何一起停下来**。
+
+在 HTTP 服务、RPC 调用、数据库查询、消息消费和后台任务里，`context.Context` 通常会沿着调用链一路传下去。它可以携带三类信息：
+
+- 取消信号：告诉下游任务不用继续做了
+- 截止时间：告诉下游任务最多能运行多久
+- 请求级值：传递 trace id、用户身份等跨 API 边界的数据
+
+## Context 接口长什么样
+
+`context.Context` 本质上是一个接口：
+
+```go
+type Context interface {
+    Deadline() (deadline time.Time, ok bool)
+    Done() <-chan struct{}
+    Err() error
+    Value(key any) any
+}
+```
+
+这四个方法分别对应四种能力：
+
+| 方法 | 作用 |
+| --- | --- |
+| `Deadline()` | 返回截止时间，如果没有设置则 `ok` 为 `false` |
+| `Done()` | 返回一个只读 channel，context 被取消或超时时会关闭 |
+| `Err()` | 返回取消原因，常见为 `context.Canceled` 或 `context.DeadlineExceeded` |
+| `Value()` | 根据 key 读取请求级数据 |
+
+平时我们很少自己实现这个接口，而是通过标准库函数创建和派生 context。
+
+## 从 Background 和 TODO 开始
+
+根 context 通常来自两个函数：
+
+```go
+ctx := context.Background()
+```
+
+`Background()` 返回一个空 context，不会被取消、没有截止时间、也没有值。它适合用在 `main` 函数、初始化逻辑、测试入口，或者一次请求的最顶层。
+
+```go
+ctx := context.TODO()
+```
+
+`TODO()` 也是空 context。它更像一个占位符：当你还没决定应该从哪里拿 context，或者正在逐步改造旧代码时，可以先用它表达“这里未来应该补上真实 context”。
+
+## 用 WithCancel 主动取消任务
+
+`WithCancel` 会基于父 context 派生一个子 context，并返回一个 `cancel` 函数：
+
+```go
+func worker(ctx context.Context) {
+    for {
+        select {
+        case <-ctx.Done():
+            fmt.Println("worker stopped:", ctx.Err())
+            return
+        default:
+            fmt.Println("working...")
+            time.Sleep(500 * time.Millisecond)
+        }
+    }
+}
+
+func main() {
+    ctx, cancel := context.WithCancel(context.Background())
+
+    go worker(ctx)
+
+    time.Sleep(2 * time.Second)
+    cancel()
+    time.Sleep(200 * time.Millisecond)
+}
+```
+
+调用 `cancel()` 后，`ctx.Done()` 会被关闭，监听它的 goroutine 就可以及时退出。这个模式在后台任务、流式读取、并发 fan-out 查询里非常常见。
+
+需要注意的是：**只要函数返回了 `cancel`，就应该在合适的位置调用它**。即使任务自然完成，也建议用 `defer cancel()` 释放关联资源和计时器。
+
+## 用 WithTimeout 控制耗时
+
+`WithTimeout` 是服务端代码里最常用的 context 派生方式之一。它会在指定时间后自动取消：
+
+```go
+func queryUser(ctx context.Context, id int64) (*User, error) {
+    ctx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+    defer cancel()
+
+    row := db.QueryRowContext(ctx, "select id, name from users where id = ?", id)
+
+    var user User
+    if err := row.Scan(&user.ID, &user.Name); err != nil {
+        return nil, err
+    }
+
+    return &user, nil
+}
+```
+
+这里的关键点不是 `300ms` 这个数字，而是 `db.QueryRowContext` 接收了 `ctx`。一旦请求取消或超时，数据库驱动就有机会中断正在执行的查询。
+
+类似地，HTTP 请求也应该使用带 context 的 API：
+
+```go
+func fetchProfile(ctx context.Context, url string) ([]byte, error) {
+    ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+    defer cancel()
+
+    req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+    if err != nil {
+        return nil, err
+    }
+
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        return nil, err
+    }
+    defer resp.Body.Close()
+
+    return io.ReadAll(resp.Body)
+}
+```
+
+## WithDeadline 与 WithTimeout 的区别
+
+`WithTimeout` 表达的是“从现在开始最多多久”：
+
+```go
+ctx, cancel := context.WithTimeout(parent, 500*time.Millisecond)
+defer cancel()
+```
+
+`WithDeadline` 表达的是“最晚到哪个具体时间点”：
+
+```go
+deadline := time.Now().Add(500 * time.Millisecond)
+ctx, cancel := context.WithDeadline(parent, deadline)
+defer cancel()
+```
+
+在业务代码里，`WithTimeout` 更直观；在需要继承外部协议、任务调度时间、全链路截止时间时，`WithDeadline` 更合适。
+
+## context 会向下传播取消
+
+context 是一棵树。父 context 取消时，所有派生出来的子 context 都会一起取消：
+
+```go
+parent, cancelParent := context.WithCancel(context.Background())
+child, cancelChild := context.WithTimeout(parent, 5*time.Second)
+defer cancelChild()
+
+go func() {
+    <-child.Done()
+    fmt.Println(child.Err())
+}()
+
+cancelParent()
+```
+
+这意味着在一次 HTTP 请求中，如果客户端断开连接，框架提供的 `r.Context()` 会被取消。只要你把它继续传给下游数据库、RPC、缓存和业务函数，整条调用链就能一起停下来。
+
+## 用 WithValue 传递请求级数据
+
+`WithValue` 可以在 context 中保存键值对：
+
+```go
+type requestIDKey struct{}
+
+func withRequestID(ctx context.Context, requestID string) context.Context {
+    return context.WithValue(ctx, requestIDKey{}, requestID)
+}
+
+func requestIDFrom(ctx context.Context) (string, bool) {
+    requestID, ok := ctx.Value(requestIDKey{}).(string)
+    return requestID, ok
+}
+```
+
+这里故意没有直接使用字符串作为 key。原因是 context 会跨包传递，如果大家都用 `"request_id"` 这种字符串 key，很容易发生碰撞。更稳妥的方式是定义一个私有 key 类型。
+
+`WithValue` 适合传这些东西：
+
+- request id
+- trace id
+- 当前用户身份
+- 鉴权 token 的派生信息
+- 日志字段
+
+它不适合传这些东西：
+
+- 函数可选参数
+- 数据库连接
+- 业务配置
+- 可以通过普通参数明确表达的数据
+
+一句话：**context value 应该是请求级、跨 API 边界、辅助性质的数据，不应该变成隐藏参数列表**。
+
+## Context 应该作为第一个参数
+
+Go 社区约定：需要 context 的函数，应该把 `ctx context.Context` 放在第一个参数：
+
+```go
+func CreateOrder(ctx context.Context, userID int64, items []Item) (*Order, error) {
+    // ...
+}
+```
+
+不要把 context 存进结构体里：
+
+```go
+type Service struct {
+    ctx context.Context // 不推荐
+}
+```
+
+context 描述的是一次调用、一次请求、一次任务的生命周期，而结构体通常比单次调用活得更久。把 context 存进结构体，很容易让生命周期变得模糊，也会让取消信号传播失控。
+
+## 在 select 中监听 Done
+
+手写 goroutine 时，最重要的习惯就是监听 `ctx.Done()`：
+
+```go
+func consume(ctx context.Context, messages <-chan Message) error {
+    for {
+        select {
+        case <-ctx.Done():
+            return ctx.Err()
+        case msg, ok := <-messages:
+            if !ok {
+                return nil
+            }
+            if err := handleMessage(ctx, msg); err != nil {
+                return err
+            }
+        }
+    }
+}
+```
+
+如果 goroutine 不监听 `Done()`，上游即使取消了 context，它也不会自动停下来。context 只提供信号，不会强制杀死 goroutine。
+
+## 取消原因：WithCancelCause 和 Cause
+
+从 Go 1.20 开始，标准库提供了 `WithCancelCause` 和 `context.Cause`。它们可以记录更具体的取消原因：
+
+```go
+var errQuotaExceeded = errors.New("quota exceeded")
+
+ctx, cancel := context.WithCancelCause(context.Background())
+cancel(errQuotaExceeded)
+
+fmt.Println(ctx.Err())        // context canceled
+fmt.Println(context.Cause(ctx)) // quota exceeded
+```
+
+`ctx.Err()` 仍然返回标准错误，方便兼容老代码；`context.Cause(ctx)` 则能拿到业务上更有意义的原因。
+
+类似地，`WithTimeoutCause` 和 `WithDeadlineCause` 可以在超时或到达截止时间时设置 cause。这在排查复杂请求链路时很有帮助，因为你能区分“用户主动取消”“上游超时”“配额耗尽”“服务熔断”等不同情况。
+
+## AfterFunc：取消后触发清理动作
+
+`context.AfterFunc` 可以注册一个函数，在 context 被取消后执行：
+
+```go
+stop := context.AfterFunc(ctx, func() {
+    conn.Close()
+})
+defer stop()
+```
+
+它适合做取消后的兜底清理，例如关闭连接、唤醒阻塞等待、打断某些不直接支持 context 的旧 API。
+
+`AfterFunc` 返回的 `stop` 可以阻止回调执行。如果回调已经开始执行，`stop` 会返回 `false`。
+
+## WithoutCancel：保留值，切断取消传播
+
+有些场景里，请求结束后你仍然想做一点收尾工作，比如写审计日志、上报指标、异步刷新缓存。此时直接复用请求的 context 可能有问题，因为请求一结束它就被取消了。
+
+`context.WithoutCancel` 可以从父 context 派生一个不会跟随父级取消的 context：
+
+```go
+func writeAuditLog(ctx context.Context, event Event) {
+    ctx = context.WithoutCancel(ctx)
+
+    go func() {
+        ctx, cancel := context.WithTimeout(ctx, time.Second)
+        defer cancel()
+
+        _ = auditClient.Write(ctx, event)
+    }()
+}
+```
+
+它会保留父 context 中的值，但不会继承取消信号和 deadline。使用它时要谨慎，最好再配一个新的 timeout，避免后台任务无限运行。
+
+## 常见错误
+
+### 忘记调用 cancel
+
+```go
+ctx, cancel := context.WithTimeout(parent, time.Second)
+defer cancel()
+```
+
+即使你认为操作一定会很快结束，也应该调用 `cancel`。这能及时释放计时器和父子 context 之间的引用。
+
+### 传 nil context
+
+不要传 `nil`：
+
+```go
+doSomething(nil) // 不推荐
+```
+
+如果暂时没有合适的 context，用 `context.TODO()`。
+
+### 把 context 当成万能容器
+
+不要为了少传几个参数就把所有东西塞进 context。显式参数更清晰、更容易测试，也更容易被 IDE 和类型系统发现问题。
+
+### 只创建 context，不向下传递
+
+下面这种写法没有意义：
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+defer cancel()
+
+result, err := slowOperation() // 没有传 ctx
+```
+
+只有当下游函数、数据库驱动、HTTP client 或 goroutine 真正接收并监听 `ctx`，取消和超时才会生效。
+
+## 实战模板：HTTP Handler 中的调用链
+
+下面是一个比较完整的写法：
+
+```go
+func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()
+
+    ctx, cancel := context.WithTimeout(ctx, 800*time.Millisecond)
+    defer cancel()
+
+    ctx = withRequestID(ctx, r.Header.Get("X-Request-ID"))
+
+    user, err := h.userService.FindByID(ctx, userIDFromRequest(r))
+    if err != nil {
+        switch {
+        case errors.Is(err, context.Canceled):
+            http.Error(w, "request canceled", http.StatusRequestTimeout)
+        case errors.Is(err, context.DeadlineExceeded):
+            http.Error(w, "request timeout", http.StatusGatewayTimeout)
+        default:
+            http.Error(w, "internal server error", http.StatusInternalServerError)
+        }
+        return
+    }
+
+    _ = json.NewEncoder(w).Encode(user)
+}
+
+func (s *UserService) FindByID(ctx context.Context, id int64) (*User, error) {
+    return s.repo.FindByID(ctx, id)
+}
+
+func (r *UserRepository) FindByID(ctx context.Context, id int64) (*User, error) {
+    row := r.db.QueryRowContext(ctx, "select id, name from users where id = ?", id)
+
+    var user User
+    if err := row.Scan(&user.ID, &user.Name); err != nil {
+        return nil, err
+    }
+
+    return &user, nil
+}
+```
+
+这段代码体现了 context 的核心用法：
+
+- 从 `r.Context()` 获取请求级 context
+- 用 `WithTimeout` 给当前 handler 增加预算
+- 用 `WithValue` 派生请求级元数据
+- 把 `ctx` 作为第一个参数向 service 和 repository 传递
+- 在数据库层使用 `QueryRowContext`
+- 根据 `context.Canceled` 和 `context.DeadlineExceeded` 做错误处理
+
+## 总结
+
+`context` 的使用原则可以压缩成几句话：
+
+1. 函数需要取消、超时或请求级数据时，显式接收 `ctx context.Context`
+2. `ctx` 放在第一个参数，并沿调用链向下传递
+3. 使用 `WithCancel` 主动停止任务，使用 `WithTimeout` 或 `WithDeadline` 设置时间预算
+4. 拿到 `cancel` 后及时调用，通常写成 `defer cancel()`
+5. goroutine 要监听 `ctx.Done()`，否则取消信号不会自动生效
+6. `WithValue` 只放请求级元数据，不放业务参数和依赖对象
+7. 需要保留取消原因时，用 `WithCancelCause` 和 `context.Cause`
+
+用好 context 之后，你的 Go 程序会更容易控制资源、更容易处理超时，也更容易在复杂调用链里保持清晰的生命周期边界。
