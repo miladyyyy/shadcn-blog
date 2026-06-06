@@ -7,7 +7,6 @@ import { postsPerPage } from '@/constants/config'
 import { createMetadata } from '@/lib/metadata'
 import { getPostsByTag, getSortedByDatePosts, getTags } from '@/lib/source'
 import { Hero } from './_components/hero'
-import { NewsletterSection } from './_components/newsletter-section'
 import Posts from './_components/posts'
 import { TagsAccordion, TagsSidebar } from './_components/tags-sidebar'
 
@@ -83,7 +82,7 @@ export default async function Page(props: {
         </div>
       </Section>
       {pageCount > 1 && <Pagination pageIndex={pageIndex} />}
-      <NewsletterSection />
+      {/* <NewsletterSection /> */}
     </Wrapper>
   )
 }

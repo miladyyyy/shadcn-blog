@@ -1,4 +1,3 @@
-import { CTA } from '@/app/(home)/_components/call-to-action'
 import Hero from '@/app/(home)/_components/hero'
 import Posts from '@/app/(home)/_components/posts'
 import { Icons } from '@/components/icons/icons'
@@ -30,7 +29,7 @@ export default function Home() {
       <Separator />
       <Posts posts={posts} />
       <Separator />
-      <CTA />
+      {/* <CTA /> */}
     </>
   )
 }

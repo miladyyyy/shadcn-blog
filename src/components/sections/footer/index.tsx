@@ -2,7 +2,6 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { ViewAnimation } from '@/components/view-animation'
 import { owner } from '@/constants/site'
 import { cn } from '@/lib/utils'
-import { Links } from './links'
 
 export const Footer = () => (
   <footer
@@ -12,7 +11,6 @@ export const Footer = () => (
       'sm:gap-16 sm:px-8 sm:py-16'
     )}
   >
-    <Links />
     <div className='grid items-center gap-4 sm:grid-cols-2'>
       <div className='flex items-center'>
         <ViewAnimation
