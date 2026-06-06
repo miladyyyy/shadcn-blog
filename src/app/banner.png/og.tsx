@@ -34,7 +34,7 @@ export function getImageResponseOptions(): ImageResponseOptions {
 }
 
 export function generate({
-  title = 'John Doe',
+  title = "Jugric's Blog",
   subtitle,
 }: GenerateProps): ReactElement {
   const hasSubtitle = Boolean(subtitle && subtitle.length > 0)
