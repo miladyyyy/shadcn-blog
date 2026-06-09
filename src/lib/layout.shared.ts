@@ -1,8 +1,8 @@
 import { zhCN } from '@fumadocs/language/zh-cn'
-import { defineTranslations } from 'fumadocs-core/i18n'
 import { uiTranslations } from 'fumadocs-ui/i18n'
+import { i18n } from '@/lib/i18n'
 
-export const translations = defineTranslations()
+export const translations = i18n
+  .translations()
   .extend(uiTranslations())
-  // Traditional Chinese
-  .preset(zhCN())
+  .preset('cn', zhCN())

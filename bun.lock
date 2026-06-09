@@ -9,6 +9,7 @@
         "@fumadocs/language": "^0.0.1",
         "@hookform/resolvers": "^5.4.0",
         "@next-safe-action/adapter-react-hook-form": "^2.0.6",
+        "@orama/tokenizers": "^3.1.18",
         "@radix-ui/react-accordion": "^1.2.12",
         "@radix-ui/react-avatar": "^1.1.11",
         "@radix-ui/react-dropdown-menu": "^2.1.16",
@@ -497,6 +498,8 @@
     "@nodelib/fs.walk": ["@nodelib/fs.walk@1.2.8", "", { "dependencies": { "@nodelib/fs.scandir": "2.1.5", "fastq": "^1.6.0" } }, "sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg=="],
 
     "@orama/orama": ["@orama/orama@3.1.18", "", {}, "sha512-a61ljmRVVyG5MC/698C8/FfFDw5a8LOIvyOLW5fztgUXqUpc1jOfQzOitSCbge657OgXXThmY3Tk8fpiDb4UcA=="],
+
+    "@orama/tokenizers": ["@orama/tokenizers@3.1.18", "", { "dependencies": { "@orama/orama": "3.1.18" } }, "sha512-Ra4dFddWZ7hCGPAehnd/6QZjlzQvczYSt1y1Fq4HteJqRu2yvfR6fXvxiUnKi+HIgJYPxKhebJEjvJdF8LYQWg=="],
 
     "@oxc-transform/binding-android-arm-eabi": ["@oxc-transform/binding-android-arm-eabi@0.124.0", "", { "os": "android", "cpu": "arm" }, "sha512-A7r8E94VSRnWlsquGXaW2rmpVcruNOTE4a/7+NCVOtlRUlbmd37bOfv0T47MLIN378uES7yldftCwcVMBG39ig=="],
 

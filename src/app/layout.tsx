@@ -11,6 +11,7 @@ import { createMetadata } from '@/lib/metadata'
 import '@/styles/globals.css'
 import 'katex/dist/katex.css'
 import { i18nProvider } from 'fumadocs-ui/i18n'
+import { i18n } from '@/lib/i18n'
 import { translations } from '@/lib/layout.shared'
 import { Body } from './layout.client'
 import { Provider } from './provider'
@@ -109,7 +110,7 @@ const RootLayout = ({ children }: { children: ReactNode }) => {
           type='application/ld+json'
         />
         <RootProvider
-          i18n={i18nProvider(translations)}
+          i18n={i18nProvider(translations, i18n.defaultLanguage)}
           search={{
             SearchDialog: CustomSearchDialog,
           }}

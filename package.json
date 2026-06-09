@@ -27,6 +27,7 @@
     "@fumadocs/language": "^0.0.1",
     "@hookform/resolvers": "^5.4.0",
     "@next-safe-action/adapter-react-hook-form": "^2.0.6",
+    "@orama/tokenizers": "^3.1.18",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
