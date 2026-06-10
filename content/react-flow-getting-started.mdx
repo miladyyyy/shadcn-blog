@@ -7,6 +7,7 @@ image: /images/blog/markdown-examples.png
 author: You
 ---
 import App from './components/react-flow-getting-started/App'
+import { File, Folder, Files } from 'fumadocs-ui/components/files'
 import {
   ReactFlowEdgeDemo,
   ReactFlowGuideDemo,
@@ -381,23 +382,27 @@ function InspectorPanel() {
 
 流程编辑器通常会持续增加功能。建议按职责拆分文件：
 
-```txt
-flow-editor/
-  canvas.tsx
-  flow-state.ts
-  layout.ts
-  types.ts
-  nodes/
-    task-node.tsx
-    branch-node.tsx
-    note-node.tsx
-  edges/
-    labeled-edge.tsx
-    condition-edge.tsx
-  panels/
-    inspector.tsx
-    toolbar.tsx
-```
+<Files>
+  <Folder name="flow-editor" defaultOpen>
+    <File name="canvas.tsx" />
+    <File name="flow-state.ts" />
+    <File name="layout.ts" />
+    <File name="types.ts" />
+    <Folder name="nodes" defaultOpen>
+      <File name="task-node.tsx" />
+      <File name="branch-node.tsx" />
+      <File name="note-node.tsx" />
+    </Folder>
+    <Folder name="edges" defaultOpen>
+      <File name="labeled-edge.tsx" />
+      <File name="condition-edge.tsx" />
+    </Folder>
+    <Folder name="panels" defaultOpen>
+      <File name="inspector.tsx" />
+      <File name="toolbar.tsx" />
+    </Folder>
+  </Folder>
+</Files>
 
 `canvas.tsx` 负责组装 `ReactFlow`。节点组件放在 `nodes/`，边组件放在 `edges/`，属性面板和工具栏放在 `panels/`。
 
