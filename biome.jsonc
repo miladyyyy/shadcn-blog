@@ -19,7 +19,8 @@
       "!**/*.md",
       "!**/*.mdx",
       "!components/ui",
-      "!**/*.grit"
+      "!**/*.grit",
+      "!content/components"
     ]
   },
   "css": {

@@ -1,0 +1,443 @@
+---
+title: "React Flow 上手指南"
+description: "从最小示例开始，介绍 React Flow 的节点、连线、自定义组件、布局和项目组织方式。"
+date: 2026-06-10
+tags: ['react', 'react-flow']
+image: /images/blog/markdown-examples.png
+author: You
+---
+import App from './components/react-flow-getting-started/App'
+import {
+  ReactFlowEdgeDemo,
+  ReactFlowGuideDemo,
+  ReactFlowLayoutDemo,
+} from './components/react-flow-getting-started/react-flow-guide-demo'
+
+React Flow 是一个用于构建节点式界面的 React 库，常见场景包括工作流编排、低代码编辑器、数据血缘图、AI Agent 流程和状态机编辑器。
+
+现在官方包名是 `@xyflow/react`。旧资料里常见的 `reactflow` 包名仍然能搜到，新项目建议直接使用 `@xyflow/react`。
+
+文章从一个最小画布开始，依次介绍节点、连线、自定义节点、自定义边和布局。目标是先建立可运行的结构，再补充真实项目会遇到的细节。
+
+## 安装
+
+安装依赖：
+
+```npm
+npm install @xyflow/react
+```
+
+
+在全局样式中引入 React Flow 的 CSS：
+
+```css title="globals.css"
+@import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
+```
+
+如果项目使用 Tailwind CSS 4，React Flow 的样式需要放在 Tailwind 后面。官方 Quick Start 也建议把这段样式放在 `global.css` 或 `index.css` 中，而不是放在业务组件里。
+
+还需要给画布父容器设置明确宽高。`ReactFlow` 会填满父容器，父容器没有高度时，页面会显示为空白。
+
+## 最小示例
+
+React Flow 的核心数据是 `nodes` 和 `edges`：
+
+- `nodes` 表示画布上的节点
+- `edges` 表示节点之间的连线
+
+<include lang="tsx" meta='title="App.tsx"'>
+  ./components/react-flow-getting-started/App.tsx
+</include>
+
+<App/>
+
+`position` 是节点在画布中的坐标。`data.label` 会被默认节点用作显示文本。`edge.source` 和 `edge.target` 对应两个节点的 `id`。
+
+这段代码可以渲染一张基础流程图，但节点拖拽、删除、连线等操作还不会写回数据。
+
+## 受控状态
+
+要让画布成为可编辑界面，需要把 React Flow 产生的变化写回状态。
+
+官方 Quick Start 使用 `applyNodeChanges`、`applyEdgeChanges` 和 `addEdge`。如果只是管理本地状态，`useNodesState` 和 `useEdgesState` 更直接。
+
+<include lang="tsx" meta='title="ControlledFlow.tsx"'>
+  ./components/react-flow-getting-started/ControlledFlow.tsx
+</include>
+
+这段代码处理了三件事：
+
+- `onNodesChange` 写回节点拖拽、选择、删除等变化
+- `onEdgesChange` 写回连线变化
+- `onConnect` 在用户新建连接时添加一条边
+
+后续接入 Zustand、Redux 或服务端同步时，也是在这几个事件上扩展。
+
+## 内置组件
+
+React Flow 提供了一些常用画布组件：
+
+- `Background`：网格背景
+- `Controls`：缩放、适配视图、锁定交互
+- `MiniMap`：小地图
+- `Panel`：固定在画布角落的容器
+
+```tsx
+import { Background, Controls, MiniMap, ReactFlow } from '@xyflow/react'
+
+export function FlowWithTools() {
+  return (
+    <div style={{ height: 420 }}>
+      <ReactFlow edges={edges} nodes={nodes} fitView>
+        <Background />
+        <MiniMap pannable zoomable />
+        <Controls />
+      </ReactFlow>
+    </div>
+  )
+}
+```
+
+这些组件需要放在 `ReactFlow` 内部。它们依赖画布上下文，不需要额外传入 `nodes` 或 `edges`。
+
+下面是一个完整一点的示例：包含自定义节点、连线、背景、小地图和控制按钮。
+
+<ReactFlowGuideDemo />
+
+## 自定义节点
+
+默认节点适合快速验证。真实项目通常需要自定义节点，例如在节点里显示状态、表单项、运行结果或错误信息。
+
+自定义节点的步骤：
+
+1. 写一个 React 组件
+2. 用 `nodeTypes` 注册组件
+3. 在节点数据中设置对应的 `type`
+
+<include lang="tsx" meta='title="WorkflowNode.tsx"'>
+  ./components/react-flow-getting-started/WorkflowNode.tsx
+</include>
+
+节点数据：
+
+```tsx
+const nodes: WorkflowNode[] = [
+  {
+    id: 'draft',
+    type: 'workflow',
+    position: { x: 0, y: 0 },
+    data: {
+      title: '写草稿',
+      description: '整理资料，确定文章结构。',
+      status: 'Ready',
+    },
+  },
+]
+```
+
+传给画布：
+
+```tsx
+<ReactFlow nodeTypes={nodeTypes} nodes={nodes} edges={edges} />
+```
+
+`nodeTypes` 建议放在组件外部，或通过 `useMemo` 保持引用稳定。频繁创建新的 `nodeTypes` 对象会触发不必要的更新，也可能出现开发环境警告。
+
+节点数据可以分成两类：
+
+- 画布数据：`position`、`selected`、`dragging`
+- 业务数据：放在 `data` 中，例如名称、接口地址、分支条件、重试次数
+
+不要把完整后端对象直接塞进 `data`。节点数据会参与渲染、保存、撤销重做和导入导出。保持 `data` 简洁，后续维护成本更低。
+
+建议遵守几条规则：
+
+- `id` 使用稳定 ID，不使用数组下标
+- `data` 只放节点渲染和编辑需要的数据
+- 大对象、请求缓存、临时运行结果放到外部 store
+- 持久化时把 `nodes` 和 `edges` 当作图结构快照
+
+## Handle
+
+Handle 是节点上的连接点。边从 `source` 类型的 Handle 出来，连接到 `target` 类型的 Handle。
+
+```tsx
+<Handle type='target' position={Position.Left} />
+<Handle type='source' position={Position.Right} />
+```
+
+常见布局是左侧输入、右侧输出。这样和从左到右的流程方向一致，也方便后续做横向布局。
+
+一个节点可以有多个 Handle。比如任务节点有“成功”和“失败”两个出口：
+
+```tsx
+<Handle id='success' type='source' position={Position.Right} />
+<Handle id='error' type='source' position={Position.Bottom} />
+```
+
+边可以指定连接到哪个 Handle：
+
+```tsx
+const edges = [
+  {
+    id: 'task-error',
+    source: 'task',
+    sourceHandle: 'error',
+    target: 'fallback',
+  },
+]
+```
+
+这类字段在工作流编辑器里很常见。它不仅说明两个节点相连，还说明连接来自哪个分支。
+
+如果 Handle 会动态增删，需要调用 `useUpdateNodeInternals()`。它会通知 React Flow 重新计算节点内部连接点的位置。
+
+## 边
+
+最基础的边只需要 `id`、`source` 和 `target`：
+
+```tsx
+const edges = [
+  {
+    id: 'a-b',
+    source: 'a',
+    target: 'b',
+  },
+]
+```
+
+真实项目里的边通常还会包含类型、标签、动画、箭头和业务状态：
+
+```tsx
+const edges = [
+  {
+    id: 'review-pass',
+    source: 'review',
+    sourceHandle: 'pass',
+    target: 'publish',
+    type: 'smoothstep',
+    animated: true,
+    label: '通过',
+  },
+]
+```
+
+常用内置边类型：
+
+- `default`：贝塞尔曲线
+- `straight`：直线
+- `step`：折线
+- `smoothstep`：圆滑折线
+
+如果只需要展示文本，使用 `label` 即可。如果需要在线上放按钮、状态标记或菜单，需要自定义边。
+
+自定义边通常由三部分组成：
+
+- 路径工具，例如 `getBezierPath`
+- `BaseEdge`，负责渲染 SVG path
+- `EdgeLabelRenderer`，负责渲染 HTML 标签
+
+```tsx
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
+  type EdgeProps,
+} from '@xyflow/react'
+
+function LabeledEdge(props: EdgeProps) {
+  const [edgePath, labelX, labelY] = getBezierPath(props)
+
+  return (
+    <>
+      <BaseEdge id={props.id} path={edgePath} />
+      <EdgeLabelRenderer>
+        <div
+          className='nodrag nopan'
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+          }}
+        >
+          审核通过
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  )
+}
+```
+
+`nodrag` 和 `nopan` 用于避免标签区域触发画布拖拽或平移。边标签中包含按钮、菜单或输入框时，建议加上。
+
+下面的示例展示了自定义边和边标签。
+
+<ReactFlowEdgeDemo />
+
+连接规则也应该单独处理。比如结束节点不能继续连出，错误分支只能连到兜底节点。
+
+简单规则可以写在 `isValidConnection`：
+
+```tsx
+<ReactFlow
+  isValidConnection={(connection) => {
+    return connection.source !== connection.target
+  }}
+/>
+```
+
+规则复杂时，可以抽成 `canConnect(nodes, edges, connection)`，并在拖线、导入、保存前校验中复用。
+
+## 布局
+
+React Flow 不内置自动布局。节点的位置由 `position` 决定，需要应用自己计算和保存。
+
+常见方案有三种：
+
+1. 保存用户拖拽后的坐标
+2. 新建节点时根据上下文给默认位置
+3. 使用布局库生成节点坐标
+
+对于流程编辑器，通常需要保存用户坐标。自动布局可以作为“整理画布”功能提供，不适合在每次数据变化后强制执行。
+
+官方 Layouting 文档列出了几类常用布局库：
+
+- dagre：适合有方向的流程图或 DAG，上手成本低
+- d3-hierarchy：适合单根树结构
+- d3-force：适合关系网络，需要处理计算时机
+- elkjs：配置能力强，适合复杂图、子流程、多 Handle 和边路由
+
+下面的示例没有引入布局库，只用两组固定坐标模拟横向和纵向布局。布局算法最终要做的事情也是一样：生成新的 `position`，再写回 `nodes`。
+
+<ReactFlowLayoutDemo />
+
+简化后的代码结构：
+
+```tsx
+function getLayoutNodes(direction: 'LR' | 'TB'): Node[] {
+  return nodes.map((node) => ({
+    ...node,
+    position: calculatePosition(node, direction),
+    sourcePosition: direction === 'LR' ? Position.Right : Position.Bottom,
+    targetPosition: direction === 'LR' ? Position.Left : Position.Top,
+  }))
+}
+
+setNodes(getLayoutNodes('LR'))
+```
+
+接入 dagre 或 elkjs 后，流程仍然类似：把 `nodes` 和 `edges` 传给布局库，拿回坐标，更新节点。区别在于布局库通常需要节点尺寸，有些计算过程是异步的。
+
+布局逻辑建议独立成文件：
+
+```txt
+flow-editor/
+  canvas.tsx
+  layout.ts
+  nodes/
+  edges/
+  panels/
+  types.ts
+```
+
+这样后续更换布局算法时，不需要改动主要画布组件。
+
+## ReactFlowProvider
+
+如果工具按钮、状态栏和面板都写在 `ReactFlow` 内部，通常不需要额外处理。它们已经在画布上下文中。
+
+当工具栏、属性面板或右键菜单被拆到画布外部，并且需要调用 `useReactFlow()` 时，需要使用 `ReactFlowProvider`。
+
+```tsx
+import { ReactFlowProvider } from '@xyflow/react'
+
+export function FlowEditorPage() {
+  return (
+    <ReactFlowProvider>
+      <FlowCanvas />
+      <InspectorPanel />
+    </ReactFlowProvider>
+  )
+}
+```
+
+外部组件可以获取画布实例：
+
+```tsx
+import { useReactFlow } from '@xyflow/react'
+
+function InspectorPanel() {
+  const { fitView, getNodes } = useReactFlow()
+
+  return (
+    <button onClick={() => console.log(getNodes())} type='button'>
+      打印节点
+    </button>
+  )
+}
+```
+
+## 项目组织
+
+流程编辑器通常会持续增加功能。建议按职责拆分文件：
+
+```txt
+flow-editor/
+  canvas.tsx
+  flow-state.ts
+  layout.ts
+  types.ts
+  nodes/
+    task-node.tsx
+    branch-node.tsx
+    note-node.tsx
+  edges/
+    labeled-edge.tsx
+    condition-edge.tsx
+  panels/
+    inspector.tsx
+    toolbar.tsx
+```
+
+`canvas.tsx` 负责组装 `ReactFlow`。节点组件放在 `nodes/`，边组件放在 `edges/`，属性面板和工具栏放在 `panels/`。
+
+状态管理可以从简单方案开始。示例和小型编辑器使用 `useNodesState`、`useEdgesState` 就够了。需要撤销重做、草稿保存、服务端校验或协作时，再抽到外部状态管理。
+
+## 常见问题
+
+没有引入 CSS。缺少 `@xyflow/react/dist/style.css` 时，节点、Handle、Controls 的样式会不完整。
+
+父容器没有高度。`ReactFlow` 不会自己撑开高度，调试时可以先固定为 `height: 420`。
+
+在组件内部重复创建 `nodeTypes` 和 `edgeTypes`。应该放在组件外部，或使用 `useMemo`。
+
+节点里有输入框但没有加 `nodrag`。输入框、选择器、按钮等交互元素需要避免触发节点拖拽。
+
+把大对象放进 `data`。这会影响渲染、持久化和撤销重做。
+
+自动布局频繁重排。用户手动调整过的位置应该保存，自动布局适合作为显式操作。
+
+## 学习路径
+
+1. 用 `nodes` 和 `edges` 渲染最小画布
+2. 用 `useNodesState`、`useEdgesState` 接管交互
+3. 用 `addEdge` 实现连线
+4. 加入 `Background`、`Controls`、`MiniMap`
+5. 使用 `nodeTypes` 自定义节点
+6. 使用 `Handle` 设计输入输出口
+7. 使用 `edgeTypes` 自定义边和标签
+8. 保存用户坐标，再按需要接入布局库
+9. 使用 `ReactFlowProvider` 连接外部工具栏和面板
+10. 处理持久化、撤销重做、协作和性能
+
+React Flow 的基础用法不复杂。更需要设计的是图结构和编辑器行为：节点数据如何拆分，连接规则如何校验，布局什么时候触发，用户坐标如何保存，错误状态显示在节点上还是边上。
+
+## 参考资料
+
+- [React Flow Quick Start](https://reactflow.dev/learn)
+- [React Flow 12.11.0](https://reactflow.dev/whats-new/2026-06-01)
+- [Custom Nodes](https://reactflow.dev/learn/customization/custom-nodes)
+- [Handles](https://reactflow.dev/learn/customization/handles)
+- [Custom Edges](https://reactflow.dev/learn/customization/custom-edges)
+- [Edge Labels](https://reactflow.dev/learn/customization/edge-labels)
+- [Layouting Overview](https://reactflow.dev/learn/layouting/layouting)
