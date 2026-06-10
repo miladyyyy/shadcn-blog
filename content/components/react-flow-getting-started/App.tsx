@@ -25,8 +25,15 @@ const edges = [
 
 export default function App() {
   return (
-    <div style={{ width: '100%', height: 420 }}>
-      <ReactFlow edges={edges} fitView nodes={nodes} />
+    <div className='not-prose overflow-hidden rounded-md border border-zinc-200 bg-white text-zinc-950 shadow-sm'>
+      <div className='h-[420px] w-full'>
+        <ReactFlow
+          className='bg-white text-zinc-950'
+          edges={edges}
+          fitView
+          nodes={nodes}
+        />
+      </div>
     </div>
   )
 }

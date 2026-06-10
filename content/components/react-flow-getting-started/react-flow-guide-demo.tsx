@@ -34,6 +34,18 @@ type WorkflowNodeData = {
 
 type WorkflowNode = Node<WorkflowNodeData, 'workflow'>
 
+const demoShellClassName =
+  'not-prose overflow-hidden rounded-md border border-zinc-200 bg-white text-zinc-950 shadow-sm'
+
+const demoHeaderClassName = 'border-zinc-200 border-b px-4 py-3'
+
+const demoDescriptionClassName = 'text-zinc-500 text-xs'
+
+const demoFlowClassName = 'bg-white text-zinc-950'
+
+const demoButtonClassName =
+  'rounded border border-zinc-200 bg-white px-3 py-1 text-xs text-zinc-950 shadow-sm hover:bg-zinc-50'
+
 const initialNodes: WorkflowNode[] = [
   {
     id: 'draft',
@@ -83,15 +95,15 @@ const initialEdges: Edge[] = [
 ]
 
 const statusClassName: Record<WorkflowNodeData['status'], string> = {
-  Ready: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-  Running: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
-  Review: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  Ready: 'bg-emerald-50 text-emerald-700',
+  Running: 'bg-blue-50 text-blue-700',
+  Review: 'bg-amber-50 text-amber-700',
 }
 
 function WorkflowCardNode({ data }: NodeProps<WorkflowNode>) {
   return (
-    <div className='min-w-48 rounded-md border border-border bg-card px-4 py-3 text-card-foreground shadow-sm'>
-      <Handle className='!bg-primary' position={Position.Left} type='target' />
+    <div className='min-w-48 rounded-md border border-zinc-200 bg-white px-4 py-3 text-zinc-950 shadow-sm'>
+      <Handle className='!bg-zinc-950' position={Position.Left} type='target' />
       <div className='flex items-center justify-between gap-3'>
         <div className='font-medium text-sm'>{data.title}</div>
         <span
@@ -100,10 +112,14 @@ function WorkflowCardNode({ data }: NodeProps<WorkflowNode>) {
           {data.status}
         </span>
       </div>
-      <p className='mt-2 text-muted-foreground text-xs leading-5'>
+      <p className='mt-2 text-xs text-zinc-500 leading-5'>
         {data.description}
       </p>
-      <Handle className='!bg-primary' position={Position.Right} type='source' />
+      <Handle
+        className='!bg-zinc-950'
+        position={Position.Right}
+        type='source'
+      />
     </div>
   )
 }
@@ -126,17 +142,18 @@ export function ReactFlowGuideDemo() {
   )
 
   return (
-    <div className='not-prose overflow-hidden rounded-md border border-border bg-background'>
-      <div className='flex items-center justify-between border-border border-b px-4 py-3'>
+    <div className={demoShellClassName}>
+      <div className={`flex items-center justify-between ${demoHeaderClassName}`}>
         <div>
           <div className='font-medium text-sm'>React Flow 工作流示例</div>
-          <div className='text-muted-foreground text-xs'>
+          <div className={demoDescriptionClassName}>
             节点可拖拽，右侧 Handle 可以继续连线。
           </div>
         </div>
       </div>
       <div className='h-[420px] w-full'>
         <ReactFlow
+          className={demoFlowClassName}
           edges={edges}
           fitView
           nodes={nodes}
@@ -185,7 +202,7 @@ function LabeledEdgeComponent({
       <BaseEdge id={id} markerEnd={markerEnd} path={edgePath} />
       <EdgeLabelRenderer>
         <div
-          className='nodrag nopan absolute rounded border border-border bg-background px-2 py-1 text-xs shadow-sm'
+          className='nodrag nopan absolute rounded border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-950 shadow-sm'
           style={{
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
           }}
@@ -247,15 +264,16 @@ const edgeDemoEdges: LabeledEdge[] = [
 
 export function ReactFlowEdgeDemo() {
   return (
-    <div className='not-prose overflow-hidden rounded-md border border-border bg-background'>
-      <div className='border-border border-b px-4 py-3'>
+    <div className={demoShellClassName}>
+      <div className={demoHeaderClassName}>
         <div className='font-medium text-sm'>自定义边和边标签</div>
-        <div className='text-muted-foreground text-xs'>
+        <div className={demoDescriptionClassName}>
           这条线不是普通 SVG path，还带有可以交互的标签层。
         </div>
       </div>
       <div className='h-[360px] w-full'>
         <ReactFlow
+          className={demoFlowClassName}
           defaultEdges={edgeDemoEdges}
           defaultNodes={edgeDemoNodes}
           edgeTypes={edgeTypes}
@@ -359,14 +377,14 @@ function LayoutPanel({
   return (
     <Panel className='flex gap-2' position='top-left'>
       <button
-        className='rounded border border-border bg-background px-3 py-1 text-xs shadow-sm'
+        className={demoButtonClassName}
         onClick={() => applyLayout('LR')}
         type='button'
       >
         横向
       </button>
       <button
-        className='rounded border border-border bg-background px-3 py-1 text-xs shadow-sm'
+        className={demoButtonClassName}
         onClick={() => applyLayout('TB')}
         type='button'
       >
@@ -383,15 +401,16 @@ export function ReactFlowLayoutDemo() {
   const [edges, , onEdgesChange] = useEdgesState(layoutEdges)
 
   return (
-    <div className='not-prose overflow-hidden rounded-md border border-border bg-background'>
-      <div className='border-border border-b px-4 py-3'>
+    <div className={demoShellClassName}>
+      <div className={demoHeaderClassName}>
         <div className='font-medium text-sm'>布局切换示例</div>
-        <div className='text-muted-foreground text-xs'>
+        <div className={demoDescriptionClassName}>
           这里用固定坐标模拟布局结果，真实项目可以换成 dagre 或 elkjs。
         </div>
       </div>
       <div className='h-[430px] w-full'>
         <ReactFlow
+          className={demoFlowClassName}
           edges={edges}
           fitView
           nodes={nodes}
