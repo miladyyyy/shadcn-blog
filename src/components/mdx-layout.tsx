@@ -1,11 +1,13 @@
+import type { TOCItemType } from 'fumadocs-core/toc'
 import { InlineTOC } from 'fumadocs-ui/components/inline-toc'
-import type { ComponentProps, ReactNode } from 'react'
+import type { ReactNode } from 'react'
+import { PageTOC, TOCProvider } from './page-toc'
 import { Section } from './section'
 
 interface MdxLayoutProps {
   children: ReactNode
   title: string
-  toc?: ComponentProps<typeof InlineTOC>['items']
+  toc?: TOCItemType[]
 }
 
 export default function MdxLayout({
@@ -22,20 +24,25 @@ export default function MdxLayout({
       </Section>
 
       <Section className='h-full' sectionClassName='flex flex-1'>
-        <article className='flex min-h-full flex-col lg:flex-row'>
-          <div className='flex flex-1 flex-col gap-4'>
-            {toc?.length ? (
-              <InlineTOC
-                className='rounded-none border-0 border-border border-b border-dashed'
-                items={toc}
-              />
-            ) : (
+        <TOCProvider toc={toc ?? []}>
+          <article className='grid min-h-full grid-cols-1 lg:grid-cols-[minmax(0,1fr)_250px]'>
+            <div className='flex flex-1 flex-col gap-4'>
+              {toc?.length ? (
+                <InlineTOC
+                  className='rounded-none border-0 border-border border-b border-dashed lg:hidden'
+                  items={toc}
+                />
+              ) : null}
+              <div className='prose min-w-0 flex-1 px-4'>{children}</div>
               <div className='py-2' />
-            )}
-            <div className='prose min-w-0 flex-1 px-4'>{children}</div>
-            <div className='py-2' />
-          </div>
-        </article>
+            </div>
+            {toc?.length ? (
+              <aside className='hidden border-border border-l border-dashed p-4 text-sm lg:sticky lg:top-[4rem] lg:flex lg:h-[calc(100vh-4rem)] lg:self-start lg:overflow-y-auto'>
+                <PageTOC items={toc} />
+              </aside>
+            ) : null}
+          </article>
+        </TOCProvider>
       </Section>
     </>
   )
