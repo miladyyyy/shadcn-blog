@@ -67,7 +67,7 @@ export async function sendWelcomeEmail({
 
   const formattedPosts = posts.map((post) => ({
     ...post.data,
-    image: `${baseUrl}${post.data.image}`,
+    image: post.data.image ? new URL(post.data.image, baseUrl).href : undefined,
     url: `${baseUrl}${post.url}`,
   }))
 

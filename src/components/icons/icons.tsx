@@ -4,6 +4,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   AtSign,
+  Calendar,
   Check,
   CheckCircle,
   ChevronDown,
@@ -92,6 +93,7 @@ export const Icons = {
   send: SendHorizonal,
   pricing: CircleDollarSign,
   phone: PhoneCall,
+  calendar: Calendar,
   gitHub: ({ ...props }: LucideProps) => (
     <svg
       aria-hidden='true'

@@ -37,14 +37,16 @@ function PostCard({
 }: NewsletterWelcomeEmailProps['posts'][0]) {
   return (
     <Section className='my-[16px]'>
-      <Link href={url}>
-        <Img
-          alt='Post image'
-          className='w-full rounded-[12px] object-cover'
-          height='320'
-          src={image ?? `${baseUrl}/images/placeholder.png`}
-        />
-      </Link>
+      {image ? (
+        <Link href={url}>
+          <Img
+            alt='Post image'
+            className='w-full rounded-[12px] object-cover'
+            height='320'
+            src={image}
+          />
+        </Link>
+      ) : null}
       <Section className='mt-[24px]'>
         <Link
           className='m-0 mt-[8px] font-semibold text-[32px] text-zinc-900 leading-[36px]'

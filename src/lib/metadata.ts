@@ -43,6 +43,10 @@ export function createMetadata(override: Metadata): Metadata {
 }
 
 export function getBlogPageImage(page: BlogPage) {
+  if (!page.data.image) {
+    return
+  }
+
   const segments = [...page.slugs, 'image.webp']
   return {
     segments,

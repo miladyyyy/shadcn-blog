@@ -16,6 +16,10 @@ export const GET = async (
     return new Response('Not Found', { status: 404 })
   }
 
+  if (!page.data.image) {
+    return new Response('Not Found', { status: 404 })
+  }
+
   const backgroundImage = await getLocalImageDataUrl(page.data.image)
 
   return new ImageResponse(
@@ -31,7 +35,9 @@ export const GET = async (
 export function generateStaticParams(): {
   slug: string[]
 }[] {
-  return getPosts().map((page) => ({
-    slug: getBlogPageImage(page).segments,
-  }))
+  return getPosts().flatMap((page) => {
+    const image = getBlogPageImage(page)
+
+    return image ? [{ slug: image.segments }] : []
+  })
 }

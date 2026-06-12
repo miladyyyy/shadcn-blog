@@ -1,6 +1,7 @@
 import { Feed } from 'feed'
 import { baseUrl } from '@/constants'
 import { description, owner, title } from '@/constants/site'
+import { getBlogPageImage } from '@/lib/metadata'
 import { getPosts } from '@/lib/source'
 
 export const dynamic = 'force-static'
@@ -40,17 +41,21 @@ function createFeed(): Feed {
 
   const posts = getPosts()
   for (const post of posts) {
+    const image = getBlogPageImage(post)
+
     feed.addItem({
       title: post.data.title,
       description: post.data.description,
       link: new URL(post.url, baseUrl).href,
-      image: {
-        title: post.data.title,
-        type: 'image/webp',
-        url: escapeForXML(
-          new URL(`/og/${post.slugs.join('/')}/image.webp`, baseUrl.href).href
-        ),
-      },
+      ...(image
+        ? {
+            image: {
+              title: post.data.title,
+              type: 'image/webp',
+              url: escapeForXML(new URL(image.url, baseUrl.href).href),
+            },
+          }
+        : {}),
       date: post.data.date,
       author: [
         {

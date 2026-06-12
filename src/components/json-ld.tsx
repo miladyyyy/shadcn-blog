@@ -1,6 +1,7 @@
 import type { BlogPosting, BreadcrumbList, Graph } from 'schema-dts'
 import { baseUrl } from '@/constants'
 import { title as homeTitle, owner } from '@/constants/site'
+import { getBlogPageImage } from '@/lib/metadata'
 import type { BlogPage } from '@/lib/source'
 
 export const PostJsonLd = ({ page }: { page: BlogPage }) => {
@@ -9,12 +10,13 @@ export const PostJsonLd = ({ page }: { page: BlogPage }) => {
   }
 
   const url = new URL(page.url, baseUrl.href).href
+  const image = getBlogPageImage(page)
 
   const post: BlogPosting = {
     '@type': 'BlogPosting',
     headline: page.data.title,
     description: page.data.description,
-    image: new URL(`/og/${page.slugs.join('/')}/image.webp`, baseUrl.href).href,
+    ...(image ? { image: new URL(image.url, baseUrl.href).href } : {}),
     datePublished: new Date(page.data.date).toISOString(),
     dateModified: page.data.lastModified
       ? new Date(page.data.lastModified).toISOString()

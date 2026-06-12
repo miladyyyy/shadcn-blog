@@ -9,7 +9,6 @@ import { PostJsonLd } from '@/components/json-ld'
 import { PageTOC, TOCProvider } from '@/components/page-toc'
 import { Section } from '@/components/section'
 import { description as homeDescription } from '@/constants/site'
-import { formatChineseDate } from '@/lib/format-date'
 import { createMetadata, getBlogPageImage } from '@/lib/metadata'
 import { getPost, getPosts } from '@/lib/source'
 import { Header } from './_components/header'
@@ -24,9 +23,7 @@ export default async function Page(props: {
   if (!page) {
     notFound()
   }
-  const { body: Mdx, toc, tags, lastModified } = page.data
-
-  const lastUpdate = lastModified ? new Date(lastModified) : undefined
+  const { body: Mdx, toc, tags } = page.data
 
   return (
     <>
@@ -56,7 +53,7 @@ export default async function Page(props: {
                 />
               </div>
             </div>
-            <div className='flex flex-col gap-4 border-border border-t border-dashed p-4 text-sm lg:sticky lg:top-[4rem] lg:h-[calc(100vh-4rem)] lg:self-start lg:overflow-y-auto lg:border-t-0 lg:border-l'>
+            <div className='flex flex-col gap-4 border-border border-t border-dashed p-4 text-sm lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:self-start lg:overflow-y-auto lg:border-t-0 lg:border-l'>
               {toc?.length ? (
                 <PageTOC
                   className='hidden border-border border-b border-dashed pb-4 lg:flex'
@@ -64,22 +61,6 @@ export default async function Page(props: {
                   scrollAreaClassName='max-h-[min(24rem,calc(100vh-20rem))]'
                 />
               ) : null}
-              <div>
-                <p className='mb-1 text-fd-muted-foreground text-sm'>
-                  发布时间
-                </p>
-                <p className='font-medium'>
-                  {formatChineseDate(page.data.date)}
-                </p>
-              </div>
-              {lastUpdate && (
-                <div>
-                  <p className='mb-1 text-fd-muted-foreground text-sm'>
-                    上次更新
-                  </p>
-                  <p className='font-medium'>{formatChineseDate(lastUpdate)}</p>
-                </div>
-              )}
               <Share url={page.url} />
             </div>
           </article>
@@ -110,10 +91,10 @@ export async function generateMetadata(props: {
     description,
     openGraph: {
       url: `/posts/${page.slugs.join('/')}`,
-      images: image.url,
+      images: image?.url,
     },
     twitter: {
-      images: image.url,
+      images: image?.url,
     },
     alternates: {
       canonical: page.url,
