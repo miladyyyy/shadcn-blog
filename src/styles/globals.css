@@ -242,17 +242,21 @@
 
 @media (prefers-reduced-motion: no-preference) {
   ::view-transition-new(theme-transition) {
-    clip-path: inset(0 0 100% 0);
-    animation: slide-in-from-top 0.65s forwards cubic-bezier(0.65, 0, 0.35, 1);
+    clip-path: circle(
+      0 at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%)
+    );
+    animation: theme-ripple 1s forwards cubic-bezier(0.65, 0, 0.35, 1);
   }
 
   ::view-transition-old(theme-transition) {
     animation: none;
   }
 
-  @keyframes slide-in-from-top {
+  @keyframes theme-ripple {
     to {
-      clip-path: inset(0 0 0 0);
+      clip-path: circle(
+        150vmax at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%)
+      );
     }
   }
 

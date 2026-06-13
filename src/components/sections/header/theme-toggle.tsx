@@ -3,7 +3,12 @@
 import { cva } from 'class-variance-authority'
 import { Airplay, Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { type ComponentProps, useEffect, useState } from 'react'
+import {
+  type ComponentProps,
+  type MouseEvent,
+  useEffect,
+  useState,
+} from 'react'
 import { cn } from '@/lib/utils'
 
 const itemVariants = cva(
@@ -43,6 +48,33 @@ export const ThemeToggle = ({
     className
   )
 
+  const handleChangeTheme = async (
+    nextTheme: 'light' | 'dark' | 'system',
+    event: MouseEvent<HTMLButtonElement>
+  ) => {
+    function update() {
+      setTheme(nextTheme)
+    }
+
+    if (document.startViewTransition && nextTheme !== resolvedTheme) {
+      document.documentElement.style.setProperty(
+        '--theme-transition-x',
+        `${event.clientX}px`
+      )
+      document.documentElement.style.setProperty(
+        '--theme-transition-y',
+        `${event.clientY}px`
+      )
+      document.documentElement.style.viewTransitionName = 'theme-transition'
+      await document.startViewTransition(update).finished
+      document.documentElement.style.viewTransitionName = ''
+      document.documentElement.style.removeProperty('--theme-transition-x')
+      document.documentElement.style.removeProperty('--theme-transition-y')
+    } else {
+      update()
+    }
+  }
+
   if (mode === 'light-dark') {
     const value = mounted ? resolvedTheme : null
 
@@ -51,7 +83,9 @@ export const ThemeToggle = ({
         aria-label={'Toggle Theme'}
         className={container}
         data-theme-toggle=''
-        onClick={() => setTheme(value === 'light' ? 'dark' : 'light')}
+        onClick={(event) =>
+          handleChangeTheme(value === 'light' ? 'dark' : 'light', event)
+        }
         type='button'
       >
         {full.map(([key, Icon]) => {
@@ -80,7 +114,7 @@ export const ThemeToggle = ({
           aria-label={key}
           className={cn(itemVariants({ active: value === key }))}
           key={key}
-          onClick={() => setTheme(key)}
+          onClick={(event) => handleChangeTheme(key, event)}
           type='button'
         >
           <Icon className='size-full' fill='currentColor' />

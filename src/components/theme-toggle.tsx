@@ -4,7 +4,12 @@ import { cva } from 'class-variance-authority'
 import { Airplay, Moon, Sun } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useTheme } from 'next-themes'
-import { type HTMLAttributes, useLayoutEffect, useState } from 'react'
+import {
+  type HTMLAttributes,
+  type MouseEvent,
+  useLayoutEffect,
+  useState,
+} from 'react'
 import { cn } from '@/lib/utils'
 
 const themes = [
@@ -58,15 +63,28 @@ export function ThemeToggle({
     setMounted(true)
   }, [])
 
-  const handleChangeTheme = async (theme: Theme) => {
+  const handleChangeTheme = async (
+    theme: Theme,
+    event: MouseEvent<HTMLButtonElement>
+  ) => {
     function update() {
       setTheme(theme)
     }
 
     if (document.startViewTransition && theme !== resolvedTheme) {
+      document.documentElement.style.setProperty(
+        '--theme-transition-x',
+        `${event.clientX}px`
+      )
+      document.documentElement.style.setProperty(
+        '--theme-transition-y',
+        `${event.clientY}px`
+      )
       document.documentElement.style.viewTransitionName = 'theme-transition'
       await document.startViewTransition(update).finished
       document.documentElement.style.viewTransitionName = ''
+      document.documentElement.style.removeProperty('--theme-transition-x')
+      document.documentElement.style.removeProperty('--theme-transition-y')
     } else {
       update()
     }
@@ -97,8 +115,8 @@ export function ThemeToggle({
             aria-label={label}
             className={itemVariants({ active: isActive })}
             key={key}
-            onClick={() => {
-              handleChangeTheme(key as Theme)
+            onClick={(event) => {
+              handleChangeTheme(key as Theme, event)
             }}
             type='button'
           >
