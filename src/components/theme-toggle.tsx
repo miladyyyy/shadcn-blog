@@ -126,7 +126,7 @@ export function ThemeToggle({
                 layoutId='activeTheme'
                 transition={{
                   type: 'spring',
-                  duration: 2.5,
+                  duration: 1,
                 }}
               />
             )}
