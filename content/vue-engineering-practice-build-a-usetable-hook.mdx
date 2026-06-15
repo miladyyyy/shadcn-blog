@@ -1,0 +1,430 @@
+---
+title: "vue 工程化实践，封装一个 useTable"
+description: "基于 Vue 3、TypeScript 和 ant-design-vue 封装通用表格 Hook，统一处理请求、分页、查询、重置和 loading 状态。"
+date: "2026-04-07"
+tags: ["Vue", "工程化"]
+author: You
+---
+
+在后台管理系统里，表格几乎是最高频的页面形态。
+
+每写一个列表页，我们都要重复处理这些逻辑：
+
+- 定义 `dataSource` 和 `loading`
+- 调接口，拿列表和总数
+- 维护分页参数
+- 查询时回到第一页
+- 重置筛选条件
+- 页码、页容量变化时重新请求
+- 适配不同后端接口返回结构
+
+这些代码本身并不复杂，但散落在每个页面里会非常啰嗦。更糟的是，不同页面各写各的，分页字段、loading 处理、异常处理很容易不一致。
+
+所以我封装了一个 `useTable`，目标很简单：页面只关心“表格配置”和“接口”，其他重复逻辑交给 Hook。
+
+## 最终使用效果
+
+页面里只需要这样写：
+
+```vue title="page.vue"
+<script setup lang="ts">
+import type { TableColumnsType } from 'ant-design-vue'
+import { useTable } from '@/hooks/useTable'
+
+type UserRecord = {
+  id: number
+  name: string
+  department: string
+  status: string
+}
+
+type UserSearchParams = {
+  keyword: string
+  page: number
+  pageSize: number
+}
+
+const columns: TableColumnsType<UserRecord> = [
+  { title: 'ID', dataIndex: 'id' },
+  { title: '姓名', dataIndex: 'name' },
+  { title: '部门', dataIndex: 'department' },
+  { title: '状态', dataIndex: 'status' },
+]
+
+// [!code highlight:15]  [!code word:tableProps]
+const { tableProps, search, reset } = useTable<UserRecord, UserSearchParams>({
+  api: getUserList,
+  defaultParams: {
+    keyword: '',
+  },
+  tableConfig: {
+    rowKey: 'id',
+    columns,
+    bordered: true,
+    pagination: {
+      pageSize: 10,
+      showQuickJumper: true,
+    },
+  },
+})
+
+const handleSearch = () => {
+  void search({ keyword: '张三' })
+}
+</script>
+
+<template>
+  <a-button type="primary" @click="handleSearch">查询</a-button>
+  <a-button @click="reset">重置</a-button>
+
+// [!code highlight] [!code word:tableProps]
+  <a-table v-bind="tableProps" />
+</template>
+```
+## API 设计
+
+这个 Hook 的入参核心只有两个：`api` 和 `tableConfig`。
+
+```ts
+const table = useTable({
+  api,
+  tableConfig,
+})
+```
+
+`api` 是真正的数据请求函数，Hook 会自动把分页参数和查询参数合并后传进去。
+
+`tableConfig` 则复用 `ant-design-vue` 的 `TableProps` 类型，只排除掉 Hook 内部接管的几个字段：
+
+```ts
+export type UseTableConfig<RecordType> = Omit<
+  TableProps<RecordType>,
+  'dataSource' | 'loading' | 'pagination'
+> & {
+  pagination?: false | TablePaginationConfig
+}
+```
+
+这样做的好处是，我们不用重新设计一套表格配置类型。`columns`、`rowKey`、`scroll`、`bordered` 这些能力都沿用组件库原本的类型，页面使用时也有完整的 TypeScript 提示。
+
+完整参数如下：
+
+| 参数 | 说明 |
+| --- | --- |
+| `api` | 请求列表数据的接口函数 |
+| `tableConfig` | 传给 `a-table` 的配置 |
+| `defaultParams` | 默认查询参数 |
+| `immediate` | 是否初始化后立即请求，默认 `true` |
+| `pageField` | 页码字段名，默认 `page` |
+| `pageSizeField` | 页容量字段名，默认 `pageSize` |
+| `beforeRequest` | 请求前转换参数 |
+| `transformResponse` | 自定义响应解析 |
+| `afterRequest` | 请求成功后的回调 |
+| `onError` | 请求失败后的回调 |
+
+返回值则面向页面使用：
+
+| 返回值 | 说明 |
+| --- | --- |
+| `tableProps` | 可直接绑定给 `a-table` 的 props |
+| `dataSource` | 表格数据 |
+| `loading` | 请求状态 |
+| `error` | 请求错误 |
+| `pagination` | 当前分页配置 |
+| `params` | 当前查询参数 |
+| `run` | 手动请求，可选择是否重置页码 |
+| `reload` | 使用当前参数刷新 |
+| `search` | 合并查询参数并回到第一页 |
+| `reset` | 重置查询参数并回到第一页 |
+| `setParams` | 只更新参数，不立即请求 |
+
+## 核心实现拆解
+
+### 1. 维护基础状态
+
+Hook 内部维护表格最常见的几个状态：
+
+```ts
+const dataSource = ref<RecordType[]>([]) as Ref<RecordType[]>
+const loading = ref(false)
+const error = ref<unknown>(null)
+const params = ref({ ...defaultParams }) as Ref<Partial<SearchParams>>
+const pagination = ref<TablePaginationConfig>({
+  ...defaultPagination,
+  ...tableConfig?.pagination,
+})
+```
+
+分页默认值可以统一放在 Hook 内：
+
+```ts
+const defaultPagination: TablePaginationConfig = {
+  current: 1,
+  pageSize: 10,
+  showSizeChanger: true,
+  showTotal: total => `共 ${total} 条`,
+}
+```
+
+这样每个页面不用重复写 `current`、`pageSize`、`showTotal` 这类配置。如果某个页面有特殊需求，再通过 `tableConfig.pagination` 覆盖即可。
+
+### 2. 组装请求参数
+
+请求前需要把查询参数和分页参数合并：
+
+```ts
+const buildRequestParams = () => {
+  const requestParams: Record<string, unknown> = {
+    ...params.value,
+  }
+
+  if (tableConfig?.pagination !== false) {
+    requestParams[pageField] = pagination.value.current ?? defaultPagination.current
+    requestParams[pageSizeField] = pagination.value.pageSize ?? defaultPagination.pageSize
+  }
+
+  const typedRequestParams = requestParams as SearchParams & Record<string, unknown>
+
+  return options.beforeRequest?.(typedRequestParams) ?? typedRequestParams
+}
+```
+
+这里保留了 `pageField` 和 `pageSizeField`，是为了适配不同后端接口。
+
+有的接口叫：
+
+```ts
+{
+  page: 1,
+  pageSize: 10,
+}
+```
+
+有的接口可能叫：
+
+```ts
+{
+  current: 1,
+  size: 10,
+}
+```
+
+使用时只需要这样配置：
+
+```ts
+useTable({
+  api,
+  pageField: 'current',
+  pageSizeField: 'size',
+})
+```
+
+如果参数结构更特殊，还可以用 `beforeRequest` 做最后一次转换。
+
+### 3. 统一请求流程
+
+`run` 是整个 Hook 的请求核心：
+
+```ts
+const run = async (nextParams?: Partial<SearchParams>, resetPage = false) => {
+  if (nextParams) {
+    setParams(nextParams)
+  }
+
+  if (resetPage && tableConfig?.pagination !== false) {
+    pagination.value.current = 1
+  }
+
+  const currentRequestId = ++requestId
+  loading.value = true
+  error.value = null
+
+  try {
+    const response = await api(buildRequestParams())
+
+    if (currentRequestId !== requestId) {
+      return
+    }
+
+    const result = options.transformResponse
+      ? options.transformResponse(response)
+      : defaultTransformResponse<RecordType>(response)
+
+    dataSource.value = result.list
+
+    if (tableConfig?.pagination !== false) {
+      pagination.value.total = result.total
+    }
+
+    options.afterRequest?.(result, response)
+  } catch (currentError) {
+    if (currentRequestId === requestId) {
+      error.value = currentError
+      options.onError?.(currentError)
+    }
+  } finally {
+    if (currentRequestId === requestId) {
+      loading.value = false
+    }
+  }
+}
+```
+
+<Callout type="info" title="关于 requestId">
+如果用户连续快速查询，可能会出现后发请求先返回、先发请求后返回的情况。如果不处理，旧请求可能覆盖新请求的数据。
+
+所以每次请求都会递增 `requestId`。响应回来时，只有当前最新请求才能更新页面状态。
+</Callout>
+
+### 4. 兼容常见接口返回结构
+
+不同项目里的列表接口返回格式经常不一样。为了减少页面样板代码，Hook 里内置了一个默认解析函数：
+
+```ts
+function defaultTransformResponse<RecordType>(response: unknown): TableListResult<RecordType> {
+  if (Array.isArray(response)) {
+    return {
+      list: response as RecordType[],
+      total: response.length,
+    }
+  }
+
+  const responseRecord = isRecord(response) ? response : undefined
+  const dataRecord = isRecord(responseRecord?.data) ? responseRecord.data : undefined
+  const pageRecord = pickFirstRecord(dataRecord, responseRecord)
+  const list = pickArray(pageRecord) ?? []
+  const total = pickTotal(pageRecord) ?? list.length
+
+  return {
+    list: list as RecordType[],
+    total,
+  }
+}
+```
+
+这样可以兼容几类常见结构：
+
+```ts
+// 直接返回数组
+[]
+
+// 返回 list / total
+{
+  list: [],
+  total: 100,
+}
+
+// 返回 data.records / data.total
+{
+  data: {
+    records: [],
+    total: 100,
+  },
+}
+```
+
+如果真实接口更复杂，可以传入 `transformResponse`：
+
+```ts
+useTable<UserRecord, UserSearchParams, ApiResponse>({
+  api: getUserList,
+// [!code highlight:4]
+  transformResponse: response => ({
+    list: response.result.items,
+    total: response.result.page.totalCount,
+  }),
+})
+```
+
+### 5. 接管 Table 的分页变化
+
+`ant-design-vue` 的表格在分页、筛选、排序变化时会触发 `onChange`。
+
+Hook 内部接管这个事件，更新当前页码和页容量，然后重新请求：
+
+```ts
+const handleTableChange: NonNullable<TableProps<RecordType>['onChange']> = (
+  nextPagination,
+  filters,
+  sorter,
+  extra,
+) => {
+  if (tableConfig?.pagination !== false) {
+    pagination.value.current = nextPagination.current ?? 1
+    pagination.value.pageSize = nextPagination.pageSize ?? pagination.value.pageSize
+  }
+
+  tableConfig?.onChange?.(nextPagination, filters, sorter, extra)
+  void run()
+}
+```
+
+这里仍然会调用 `tableConfig.onChange`，所以页面如果需要处理排序、筛选等额外逻辑，也不会被 Hook 限制。
+
+### 6. 生成 tableProps
+
+最后，用 `computed` 生成真正传给表格的 props：
+
+```ts
+const tableProps = computed<TableProps<RecordType>>(() => {
+  const { pagination: tablePagination, ...restTableConfig } = tableConfig ?? {}
+
+  return {
+    ...restTableConfig,
+    dataSource: dataSource.value,
+    loading: loading.value,
+    pagination: tablePagination === false ? false : pagination.value,
+    onChange: handleTableChange,
+  }
+})
+```
+
+页面只需要：
+
+```vue
+// [!code word:tableProps]
+<a-table v-bind="tableProps" />
+```
+
+这也是设计这个 Hook 的核心目的：把重复的表格状态收敛到一个对象里。
+
+## 查询与重置
+
+Hook 里封装了三个常用动作：
+
+```ts
+const reload = () => run()
+const search = (nextParams?: Partial<SearchParams>) => run(nextParams, true)
+const reset = () => {
+  params.value = { ...defaultParams }
+  return run(undefined, true)
+}
+```
+
+它们的区别是：
+
+- `reload`：使用当前参数刷新当前页
+- `search`：合并新查询参数，并回到第一页
+- `reset`：恢复默认参数，并回到第一页
+
+这符合大多数后台列表页的使用习惯。查询条件变化后，一般应该重新从第一页开始看结果。
+
+## 完整代码
+<include lang="ts" meta='title="useTable.ts"'>
+./components/useTable.ts
+</include>
+
+## 总结
+
+`useTable` 大致设计思路：
+
+- 用 TypeScript 泛型约束表格行数据、查询参数和接口响应
+- 复用 `ant-design-vue` 的 `TableProps`，减少重复类型设计
+- 自动维护 `dataSource`、`loading`、`error`、`pagination`
+- 统一处理查询、重置、刷新和分页变化
+- 内置常见响应结构解析，也支持 `transformResponse` 自定义
+- 用 `requestId` 避免旧请求覆盖新请求
+
+封装完成后，列表页的代码会更聚焦：页面负责业务字段和交互，Hook 负责请求和表格状态。
+
+这类封装不一定要一步到位。可以先从最常见的分页表格开始，等项目里出现更多真实场景，再逐步补充排序、筛选、缓存、选择行等能力。好的工具，通常都是被业务慢慢打磨出来的。

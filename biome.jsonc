@@ -20,7 +20,7 @@
       "!**/*.mdx",
       "!components/ui",
       "!**/*.grit",
-      "!content/components"
+      "!content"
     ]
   },
   "css": {
