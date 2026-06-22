@@ -1,7 +1,7 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 import { Children, type ReactNode } from 'react'
-import { Balancer } from 'react-wrap-balancer'
 import { ViewAnimation } from '@/components/view-animation'
+import { Balancer } from '@/components/wrap-balancer'
 import { cn } from '@/lib/utils'
 import { Section } from '../section'
 

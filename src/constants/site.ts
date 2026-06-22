@@ -8,6 +8,7 @@ export const owner = 'Jugric'
 export const baseOptions: BaseLayoutProps = {
   nav: {
     title,
+    transparentMode: 'always',
   },
   githubUrl: `https://github.com/${ghOwner}/${repo}`,
 }

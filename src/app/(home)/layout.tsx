@@ -16,7 +16,6 @@ const Layout = ({ children }: { children: ReactNode }) => {
           <Header
             links={linkItems}
             {...baseOptions}
-            nav={{ transparentMode: 'always' }}
             themeSwitch={{ enabled: false }}
           />
         ),

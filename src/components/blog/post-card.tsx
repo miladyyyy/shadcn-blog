@@ -2,8 +2,8 @@ import { CalendarIcon } from 'lucide-react'
 import Link from 'next/link'
 import type React from 'react'
 import { ViewTransition } from 'react'
-import Balancer from 'react-wrap-balancer'
 import { BlurImage } from '@/components/blur-image'
+import Balancer from '@/components/wrap-balancer'
 
 interface PostCardProps {
   title: string

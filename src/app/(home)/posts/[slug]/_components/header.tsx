@@ -1,11 +1,11 @@
 // adapted from https://github.com/braydoncoyer/braydoncoyer.dev/
 import * as motion from 'motion/react-client'
-import Balancer from 'react-wrap-balancer'
 import { BlurImage } from '@/components/blur-image'
 import { Icons } from '@/components/icons/icons'
 import { Section } from '@/components/section'
 import { TagCard } from '@/components/tags/tag-card'
 import { ViewAnimation } from '@/components/view-animation'
+import Balancer from '@/components/wrap-balancer'
 import { formatChineseDate } from '@/lib/format-date'
 import type { BlogPage as MDXPage } from '@/lib/source'
 

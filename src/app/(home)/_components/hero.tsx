@@ -1,13 +1,13 @@
 import * as motion from 'motion/react-client'
 import Image from 'next/image'
 import Link from 'next/link'
-import Balancer from 'react-wrap-balancer'
 import { Icons } from '@/components/icons/icons'
 import { Section } from '@/components/section'
 import { buttonVariants } from '@/components/ui/button'
 import { ViewAnimation } from '@/components/view-animation'
-import { owner } from '@/constants/site'
+import Balancer from '@/components/wrap-balancer'
 import { cn } from '@/lib/utils'
+import avatarImage from '../../../../public/images/avatar.png'
 import heroImage from '../../../../public/images/gradient-noise-purple-azure-light.png'
 
 const Hero = () => {
@@ -34,7 +34,7 @@ const Hero = () => {
         />
       </motion.div>
 
-      <ViewAnimation
+      {/* <ViewAnimation
         delay={0.05}
         initial={{ opacity: 0, translateY: -6 }}
         whileInView={{ opacity: 1, translateY: 0 }}
@@ -45,16 +45,20 @@ const Hero = () => {
             Full-Stack Developer & Tech Writer
           </span>
         </div>
-      </ViewAnimation>
+      </ViewAnimation> */}
 
       <ViewAnimation
         delay={0.1}
         initial={{ opacity: 0, translateY: -6 }}
         whileInView={{ opacity: 1, translateY: 0 }}
       >
-        <h1 className='max-w-3xl text-center font-bold text-4xl leading-tight tracking-tighter sm:text-5xl md:max-w-4xl md:text-6xl lg:leading-[1.1]'>
-          <Balancer>I'm {owner}!</Balancer>
-        </h1>
+        <Image
+          alt='avatar'
+          className='rounded-full'
+          height={100}
+          src={avatarImage}
+          width={100}
+        />
       </ViewAnimation>
 
       <ViewAnimation
