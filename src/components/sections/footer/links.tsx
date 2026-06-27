@@ -7,6 +7,7 @@ import { postsPerPage } from '@/constants/config'
 import { linkItems, socials } from '@/constants/navigation'
 import { baseOptions } from '@/constants/site'
 import { getSortedByDatePosts, getTags } from '@/lib/source'
+import { getTagHref } from '@/lib/tag-url'
 
 interface ListItem {
   title: string
@@ -58,7 +59,7 @@ export const Links = () => {
     {
       title: 'Tags',
       items: tags.slice(0, postsPerPage).map((tag) => ({
-        href: `/tags/${tag}`,
+        href: getTagHref(tag),
         children: <span className='capitalize'>{tag}</span>,
       })),
     },

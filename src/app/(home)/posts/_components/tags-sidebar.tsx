@@ -9,6 +9,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { ViewAnimation } from '@/components/view-animation'
+import { getTagHref } from '@/lib/tag-url'
 import { cn } from '@/lib/utils'
 
 const MAX_TAGS = 8
@@ -41,7 +42,7 @@ export function TagsAccordion({ tags }: TagsSidebarProps) {
               >
                 <Link
                   className='flex items-center justify-between bg-background p-3 text-muted-foreground text-sm transition-colors hover:bg-card/80'
-                  href={`/tags/${tag.name}`}
+                  href={getTagHref(tag.name)}
                 >
                   <span>{tag.name}</span>
                   <span className='text-xs'>({tag.count})</span>
@@ -87,7 +88,7 @@ export function TagsSidebar({ tags }: TagsSidebarProps) {
                 'group flex items-center justify-between px-4 py-2 text-sm transition-colors',
                 'text-muted-foreground hover:bg-card/80'
               )}
-              href={`/tags/${tag.name}`}
+              href={getTagHref(tag.name)}
             >
               <span className='transition-transform group-hover:translate-x-0.5'>
                 {tag.name}

@@ -11,6 +11,7 @@ import { postsPerPage } from '@/constants/config'
 import { formatChineseDate } from '@/lib/format-date'
 import { createMetadata } from '@/lib/metadata'
 import { getPostsByTag, getTags } from '@/lib/source'
+import { decodeTagSlug, encodeTagSlug, getTagHref } from '@/lib/tag-url'
 
 export const dynamicParams = false
 
@@ -73,7 +74,7 @@ const Header = ({
 const Pagination = ({ pageIndex, tag }: { pageIndex: number; tag: string }) => {
   const handlePageChange = async (page: number) => {
     'use server'
-    redirect(`/tags/${tag}?page=${page}`)
+    redirect(`${getTagHref(tag)}?page=${page}`)
   }
 
   return (
@@ -95,10 +96,11 @@ export default async function Page(props: {
   const params = await props.params
   const searchParams = await props.searchParams
 
-  const tag = params.slug[0]
-  if (!tag) {
+  const tagSlug = params.slug[0]
+  if (!tagSlug) {
     return notFound()
   }
+  const tag = decodeTagSlug(tagSlug)
 
   const pageIndex = searchParams.page
     ? Number.parseInt(searchParams.page[0] ?? '', 10) - 1
@@ -150,10 +152,10 @@ export default async function Page(props: {
 export const generateStaticParams = () => {
   const tags = getTags()
   return [
-    ...tags.map((tag) => ({ slug: [tag] })),
+    ...tags.map((tag) => ({ slug: [encodeTagSlug(tag)] })),
     ...tags.flatMap((tag) =>
       Array.from({ length: pageCount(tag) }, (_, index) => ({
-        slug: [tag, (index + 1).toString()],
+        slug: [encodeTagSlug(tag), (index + 1).toString()],
       }))
     ),
   ]
@@ -171,7 +173,8 @@ export async function generateMetadata(
   const params = await props.params
   const searchParams = await props.searchParams
 
-  const tag = params.slug[0]
+  const tagSlug = params.slug[0]
+  const tag = tagSlug ? decodeTagSlug(tagSlug) : ''
   const pageIndex = searchParams.page
     ? Number.parseInt(searchParams.page.toString(), 10)
     : 1
@@ -181,8 +184,8 @@ export async function generateMetadata(
     ? `${tag} Posts`
     : `${tag} Posts - Page ${pageIndex}`
   const canonicalUrl = isFirstPage
-    ? `/tags/${tag}`
-    : `/tags/${tag}?page=${pageIndex}`
+    ? getTagHref(tag)
+    : `${getTagHref(tag)}?page=${pageIndex}`
 
   return createMetadata({
     title: pageTitle,

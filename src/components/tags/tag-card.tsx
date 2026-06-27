@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Icons } from '@/components/icons/icons'
 import { getPostsByTag } from '@/lib/source'
+import { getTagHref } from '@/lib/tag-url'
 import { cn } from '@/lib/utils'
 
 export const TagCard = ({
@@ -20,7 +21,7 @@ export const TagCard = ({
         'group inline-flex items-center gap-2 rounded-lg bg-card/50 px-3 py-2 text-sm transition-colors hover:bg-card/80',
         className
       )}
-      href={`/tags/${name}`}
+      href={getTagHref(name)}
     >
       <Icons.tag
         className='my-auto text-muted-foreground transition-transform group-hover:rotate-12'

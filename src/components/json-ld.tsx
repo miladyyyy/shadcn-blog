@@ -3,6 +3,7 @@ import { baseUrl } from '@/constants'
 import { title as homeTitle, owner } from '@/constants/site'
 import { getBlogPageImage } from '@/lib/metadata'
 import type { BlogPage } from '@/lib/source'
+import { getTagHref } from '@/lib/tag-url'
 
 export const PostJsonLd = ({ page }: { page: BlogPage }) => {
   if (!page) {
@@ -94,7 +95,7 @@ export const TagJsonLd = ({ tag }: { tag: string }) => {
         '@type': 'ListItem',
         position: 3,
         name: `${homeTitle} | Posts tagged with ${tag}`,
-        item: new URL(`/tags/${tag}`, baseUrl.href).href,
+        item: new URL(getTagHref(tag), baseUrl.href).href,
       },
     ],
   }
