@@ -11,7 +11,7 @@ import { postsPerPage } from '@/constants/config'
 import { formatChineseDate } from '@/lib/format-date'
 import { createMetadata } from '@/lib/metadata'
 import { getPostsByTag, getTags } from '@/lib/source'
-import { decodeTagSlug, encodeTagSlug, getTagHref } from '@/lib/tag-url'
+import { decodeTagSlug, getTagHref } from '@/lib/tag-url'
 
 export const dynamicParams = false
 
@@ -152,10 +152,10 @@ export default async function Page(props: {
 export const generateStaticParams = () => {
   const tags = getTags()
   return [
-    ...tags.map((tag) => ({ slug: [encodeTagSlug(tag)] })),
+    ...tags.map((tag) => ({ slug: [tag] })),
     ...tags.flatMap((tag) =>
       Array.from({ length: pageCount(tag) }, (_, index) => ({
-        slug: [encodeTagSlug(tag), (index + 1).toString()],
+        slug: [tag, (index + 1).toString()],
       }))
     ),
   ]
