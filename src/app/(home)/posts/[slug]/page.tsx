@@ -1,9 +1,11 @@
 import { File, Files, Folder } from 'fumadocs-ui/components/files'
+import { ImageZoom } from 'fumadocs-ui/components/image-zoom'
 import { InlineTOC } from 'fumadocs-ui/components/inline-toc'
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 import defaultMdxComponents from 'fumadocs-ui/mdx'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import type { ComponentProps } from 'react'
 import BlogProgressBar from '@/components/blog/progress-bar'
 import { PostJsonLd } from '@/components/json-ld'
 import { PageTOC, TOCProvider } from '@/components/page-toc'
@@ -49,6 +51,11 @@ export default async function Page(props: {
                     Folder,
                     Tabs,
                     Tab,
+                    img: (props) => (
+                      <ImageZoom
+                        {...(props as ComponentProps<typeof ImageZoom>)}
+                      />
+                    ),
                   }}
                 />
               </div>
