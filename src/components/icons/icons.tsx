@@ -40,6 +40,7 @@ import {
   Settings,
   ShareIcon,
   SunMedium,
+  TableOfContents,
   Tag,
   Tags,
   Trash,
@@ -94,6 +95,7 @@ export const Icons = {
   pricing: CircleDollarSign,
   phone: PhoneCall,
   calendar: Calendar,
+  toc: TableOfContents,
   gitHub: ({ ...props }: LucideProps) => (
     <svg
       aria-hidden='true'

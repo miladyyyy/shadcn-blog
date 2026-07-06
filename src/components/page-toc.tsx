@@ -4,6 +4,7 @@ import type { TOCItemType } from 'fumadocs-core/toc'
 import { TOCScrollArea } from 'fumadocs-ui/components/toc'
 import { TOCEmpty, TOCItem, TOCItems } from 'fumadocs-ui/components/toc/clerk'
 import type { ComponentProps } from 'react'
+import { Icons } from '@/components/icons/icons'
 import { cn } from '@/lib/utils'
 
 type PageTOCProps = {
@@ -21,7 +22,10 @@ export function PageTOC({
 }: PageTOCProps) {
   return (
     <div className={cn('flex min-h-0 flex-col gap-2', className)} {...props}>
-      <p className='font-medium text-sm'>{title}</p>
+      <p className='flex items-center gap-1.5 font-medium text-sm'>
+        <Icons.toc className='size-4' />
+        {title}
+      </p>
       {items.length ? (
         <TOCScrollArea
           className={cn(
