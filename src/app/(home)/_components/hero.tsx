@@ -68,9 +68,7 @@ const Hero = () => {
       >
         <p className='max-w-xl text-center text-muted-foreground md:max-w-2xl md:text-lg'>
           <Balancer>
-            I write about web development, software engineering, and the latest
-            technologies. I also create fun projects and tutorials to help you
-            learn and grow as a developer.
+            欢迎来到我的博客！这里分享我在前端开发、全栈工程和技术写作方面的经验与见解。希望我的文章能为你提供有价值的参考和启发。
           </Balancer>
         </p>
       </ViewAnimation>

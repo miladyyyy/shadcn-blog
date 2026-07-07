@@ -1,0 +1,236 @@
+---
+title: Ghostty 官网终端动画拆解
+description: 拆解 Ghostty 官网首页终端动画的实现：从视频生成字符画帧，再逐帧播放。
+date: 2026-07-06
+author: You
+tags: [其他]
+image: /images/blog/ghostty-terminal-animation-decomposition-cover.png
+---
+import GhosttyTerminalAnimation from '@/components/ghostty-terminal-animation'
+
+之前访问 [Ghostty 官网](https://ghostty.org/) 的时候，我对首页那段终端动画很感兴趣：它看起来像一段在真实终端里播放的字符动画，但又能非常自然地嵌在网页里。
+
+好在 Ghostty 官网的源码也是开源的，所以这篇文章就顺着源码拆一下它的实现思路：动画数据从哪里来、这些 `.txt` 帧文件是怎么生成的，以及前端组件又是如何把它们播放出来的。
+
+先看一下最终效果：
+
+<GhosttyTerminalAnimation />
+
+## 首页组件
+
+从首页入口开始看，核心逻辑在 `HomeContent` 里。这里最值得关注的是 `AnimatedTerminal` 组件，它接收了一组 `frames`，然后按照固定间隔切换当前帧。
+
+<include lang="tsx" meta='title="HomeContent.tsx"'>
+  ./components/ghostty-website/HomeContent.tsx
+</include>
+
+`HomeContent` 做了两件事：
+
+- 从 `terminalData` 中筛出 `home/animation_frames` 下面的帧数据
+- 根据窗口宽高选择终端字体尺寸，避免终端在小屏幕下撑破布局
+
+真正负责播放动画的是 `AnimatedTerminal`：
+
+<include lang="tsx" meta='title="AnimatedTerminal.tsx"'>
+  ./components/ghostty-website/AnimatedTerminal.tsx
+</include>
+
+这个组件本身并不关心帧是怎么来的。它只维护一个 `currentFrame`，然后在 `requestAnimationFrame` 驱动的循环里递增索引，最后把当前帧传给 `Terminal` 组件渲染。
+
+也就是说，前端播放部分其实很克制：它没有在浏览器里做图像处理，也没有动态计算字符画，只是在播放一组已经准备好的文本帧。
+
+## 帧数据从哪里来
+
+继续往上找，`HomeContent` 接收的 `terminalData` 来自首页的 `page.tsx`。
+
+<include lang="tsx" meta='title="page.tsx"'>
+  ./components/ghostty-website/page.tsx
+</include>
+
+这里调用了 `loadAllTerminalFiles('/home')`，把 `terminals/home` 目录下的文本文件都读出来。再看一下 `loadAllTerminalFiles` 的实现：
+
+<include lang="tsx" meta='title="terminal-data.tsx"'>
+  ./components/ghostty-website/terminal-data.tsx
+</include>
+
+它做了下面几件事：
+
+1. 递归遍历 `terminals` 目录
+2. 找出所有 `.txt` 文件
+3. 把每个文件按行读取成 `string[]`
+4. 用文件路径生成 slug，最终得到一个 `{ slug: 文件内容[] }` 的映射
+
+所以 `AnimatedTerminal` 拿到的 `frames`，本质上就是一组二维文本数据：第一层数组表示动画帧，第二层数组表示这一帧里的每一行。
+
+我们再看一下 terminals 目录下的文件结构
+
+![terminals 目录](/images/blog/terminals-dir.png)
+
+打开其中一个 `.txt` 文件，就能看到已经处理好的字符画帧：
+
+![frame](/images/blog/ghostty-animation-fram.png)
+
+
+
+到这里，网页播放链路已经清楚了：
+
+帧文件里并不是纯文本，蓝色部分会被包进 `<span class="b">...</span>`。后续 `Terminal` 渲染时会把 `.b` 这类片段高亮成品牌色，于是终端里的 Ghostty 图案就有了分层。
+
+```txt
+mp4 -> 一组 txt 帧 -> terminalData -> AnimatedTerminal -> Terminal
+```
+
+接下来的问题是：这些 `.txt` 帧文件是怎么从视频生成出来的？
+
+## 视频转终端帧
+
+在 `bin/video-to-terminal` 目录下，可以看到一个 `video-to-terminal.sh` 脚本和一个 mp4 文件：
+
+![bin 目录](/images/blog/ghostty-bin-dir.png)
+
+脚本内容如下：
+
+<include lang="sh" meta='title="video-to-terminal.sh"'>
+  ./components/ghostty-website/video-to-terminal.sh
+</include>
+
+这个脚本的作用可以概括为一句话：把视频拆成图片帧，再把每一张图片转换成终端可渲染的字符画。
+
+拆开看，它主要分成四步。
+
+### 1. 配置输出尺寸和颜色范围
+
+脚本开头定义了一组常量：
+
+```sh
+FONT_RATIO=".44"
+OUTPUT_FPS=24
+OUTPUT_COLUMNS=100
+```
+
+`OUTPUT_FPS` 决定输出帧率，`OUTPUT_COLUMNS` 决定最终字符画的宽度。这里宽度固定为 100 列，也正好对应前端里 `AnimatedTerminal` 的 `columns={100}`。
+
+`FONT_RATIO` 则用来处理一个容易忽略的问题：终端里的字符不是正方形像素。一个字符单元通常更高、更窄，如果直接把图片按像素转字符，画面会被纵向拉伸。所以脚本会先把图片高度压缩到原来的 `0.44`，让最终在终端字体里看起来更接近原始比例。
+
+后面还定义了蓝色和白色的 RGB 参考值，以及颜色距离、亮度范围：
+
+```sh
+BLUE="0,0,230"
+WHITE="215,215,215"
+```
+
+这说明脚本并不是把所有像素都转成字符，而是只关心接近蓝色和白色的部分。其他颜色会被当作空白处理。
+
+### 2. 用 ffmpeg 拆出图片帧
+
+`generate_frame_images` 里先调用 `ffmpeg`：
+
+```sh
+ffmpeg \
+  -loglevel error \
+  -i "$video_file" \
+  -vf "scale=$OUTPUT_COLUMNS:-2,fps=$OUTPUT_FPS" \
+  "$frame_images_dir/frame_%04d.png"
+```
+
+这一步会把输入视频拆成一组 png 图片，并且在拆帧时完成两件事：
+
+- `scale=$OUTPUT_COLUMNS:-2`：把宽度缩放到 100 像素，高度按比例自动计算
+- `fps=$OUTPUT_FPS`：按 24fps 输出图片帧
+
+也就是说，视频在这里已经变成了 `frame_0001.png`、`frame_0002.png` 这样的图片序列。
+
+### 3. 用 ImageMagick 读取像素
+
+接着脚本会遍历每一张 png。前面提到过，终端字符不是正方形，所以它先用 ImageMagick 调整高度：
+
+```sh
+magick "$f" -resize "x$new_height"'!' "$squished_image_file"
+```
+
+然后再把图片导出成 ImageMagick 的文本格式：
+
+```sh
+magick "$f" "$imagemagick_text_file"
+```
+
+这个文本文件会按行描述每个像素的位置和颜色。脚本随后逐行读取它，解析出坐标和 RGB：
+
+```sh
+local xy="$(echo "$line" | cut -f1 -d ' ' | sed 's/://g')"
+local rgb="$(echo "$line" | cut -f2 -d ' ' | cut -d "(" -f 2 | cut -d ")" -f1)"
+```
+
+当 `column` 回到 `0` 且 `row` 不是 `0` 时，就说明进入了新的一行，于是往输出 `.txt` 文件里写一个换行。这样图片里的二维像素矩阵，就被转换成了文本里的行列结构。
+
+### 4. 把像素映射成字符
+
+最核心的是 `pixel_for` 函数。它会先计算当前像素的亮度：
+
+```sh
+local luminance=$(awk -v r="$r" -v g="$g" -v b="$b" 'BEGIN{print int((0.2126 * r + 0.7152 * g + 0.0722 * b) / 1)}')
+```
+
+这里用的是相对亮度公式：绿色权重最高，红色其次，蓝色最低。这比简单地 `(r + g + b) / 3` 更符合人眼对亮度的感知。
+
+然后脚本计算当前像素到蓝色、白色参考值的距离：
+
+```sh
+local blue_distance="$(color_distance_from "$BLUE" "$1")"
+local white_distance="$(color_distance_from "$WHITE" "$1")"
+```
+
+如果像素接近蓝色，就输出 `B0` 到 `B9`；如果接近白色，就输出 `W0` 到 `W9`；否则输出空格。
+
+这里的 `B` 和 `W` 只是中间标记，后面的数字才表示亮度等级。亮度越高，数字越大。
+
+最后，脚本用一串 `sed` 把数字替换成不同密度的字符：
+
+```sh
+sed 's/0/·/g' \
+| sed 's/1/~/g' \
+| sed 's/2/o/g' \
+| sed 's/3/x/g' \
+| sed 's/4/+/g' \
+| sed 's/5/=/g' \
+| sed 's/6/*/g' \
+| sed 's/7/%/g' \
+| sed 's/8/$/g' \
+| sed 's/9/@/g'
+```
+
+这组字符从稀疏到密集排列，正好可以模拟不同亮度的像素。比如 `·` 很轻，`@` 很重，于是字符画就有了明暗层次。
+
+蓝色区域还会先被 Perl 包成 span：
+
+```sh
+perl -pe 's/(B[0-9](?:B[0-9])*)/<span class="b">\1<\/span>/g'
+```
+
+所以前面看到的帧文件里才会出现 `<span class="b">...</span>`。这一步把“颜色信息”保留下来，而不是在转成字符后完全丢掉。
+
+## 前端播放逻辑
+
+经过脚本处理后，每一帧都已经是前端可以直接渲染的文本。`AnimatedTerminal` 要做的事就很简单了：
+
+1. 用 `requestAnimationFrame` 建一个稳定的动画循环
+2. 根据 `frameLengthMs` 控制实际更新频率
+3. 每次更新时把 `currentFrame` 加一
+4. 用取模让动画循环播放
+
+这里没有使用 `setInterval`，而是自己封装了一个 `AnimationManager`。好处是动画循环仍然挂在浏览器的 `requestAnimationFrame` 上，但帧更新可以按指定 FPS 节流，不需要每个浏览器渲染帧都切换一次文本内容。
+
+<Callout type="idea">
+组件里还有一个小彩蛋：输入 [Konami Code](https://en.wikipedia.org/wiki/Konami_Code)（上、上、下、下、左、右、左、右、B、A） 后，会把动画 FPS 切到 240，再输入一次切回来。
+</Callout>
+
+
+## 小结
+
+Ghostty 官网这个效果看起来像是“网页里跑了一个终端动画引擎”，但拆开以后会发现，它的思路非常朴素：
+
+- 离线阶段：用 `ffmpeg` 和 ImageMagick 把视频转成字符画帧
+- 构建阶段：读取 `.txt` 文件，整理成帧数组
+- 运行阶段：React 只负责按时间切换当前帧
+
+这个实现最巧妙的地方在于，它把视频到字符画的转换放在离线阶段完成，浏览器端只需要像播放胶片一样逐帧切换文本。最终呈现出来的是一个很有质感的终端动画，但运行时成本其实很低。

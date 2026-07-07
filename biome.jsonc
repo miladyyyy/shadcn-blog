@@ -18,6 +18,7 @@
       "!bun.lock",
       "!**/*.md",
       "!**/*.mdx",
+      "!src/components/ghostty-terminal-animation/frames.ts",
       "!components/ui",
       "!**/*.grit",
       "!content"
