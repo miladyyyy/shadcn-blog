@@ -1,2 +1,2 @@
-export const owner = 'techwithanirudh'
+export const owner = 'miladyyyy'
 export const repo = 'shadcn-blog'

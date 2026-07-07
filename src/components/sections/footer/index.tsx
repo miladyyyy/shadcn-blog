@@ -19,7 +19,13 @@ export const Footer = () => (
           whileInView={{ opacity: 1, translateY: 0 }}
         >
           <p className='whitespace-nowrap text-muted-foreground text-sm'>
-            &copy; {new Date().getFullYear()} {owner}. All rights reserved.
+            <a
+              className='underline decoration-solid'
+              href='https://creativecommons.org/licenses/by-nc-sa/4.0/'
+            >
+              CC BY-NC-SA 4.0
+            </a>{' '}
+            &copy; {new Date().getFullYear()} {owner}.
           </p>
         </ViewAnimation>
       </div>

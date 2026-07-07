@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 
 export function Share({
   url,
-  label = 'Share Post',
+  label = '分享文章',
 }: {
   url: string
   label?: string
@@ -22,9 +22,9 @@ export function Share({
 
   const onClick = async (): Promise<void> => {
     await copyToClipboard(`${window.location.origin}${url}`)
-    toast.success('Copied to clipboard!', {
+    toast.success('已复制到剪贴板', {
       icon: <Icons.copied className='size-4' />,
-      description: 'The post link has been copied to your clipboard.',
+      description: '文章链接已复制到剪贴板。',
     })
   }
 

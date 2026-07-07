@@ -26,7 +26,7 @@ const Hero = () => {
       >
         <Image
           alt='Hero Background'
-          className='pointer-events-none absolute right-0 bottom-0 h-[900px] w-[1004px] max-w-[1004px] translate-x-1/2 translate-y-1/2 select-none opacity-80 dark:opacity-100'
+          className='pointer-events-none absolute right-0 bottom-0 h-225 w-251 max-w-251 translate-x-1/2 translate-y-1/2 select-none opacity-80 dark:opacity-100'
           height={600}
           priority
           src={heroImage}
@@ -89,7 +89,7 @@ const Hero = () => {
             )}
             href='/posts'
           >
-            Browse Posts
+            浏览文章
             <Icons.arrowRight className='ml-2 size-5 transition-transform group-hover:-rotate-45' />
           </Link>
         </div>

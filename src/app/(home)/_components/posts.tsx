@@ -45,7 +45,7 @@ export default function Posts({ posts }: { posts: BlogPage[] }) {
             })}
             href='/posts'
           >
-            View More
+            查看更多
             <Icons.arrowRight className='ml-2 size-5 transition-transform group-hover:-rotate-45' />
           </Link>
         </ViewAnimation>
