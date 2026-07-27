@@ -1,0 +1,1030 @@
+---
+title: "Go 常见设计模式：从接口、组合到并发的工程实践"
+description: "本文用 Go 的语言习惯讲解工厂、Functional Options、适配器、装饰器、策略、观察者、责任链、状态以及 Worker Pool 等常见设计模式，并分析它们的适用场景与代价。"
+date: 2026-07-26
+tags: ['golang', '设计模式']
+author: You
+---
+
+设计模式经常被描述成一套需要记忆的 UML 图和类关系，但它真正有价值的部分并不是结构本身，而是它总结了软件中反复出现的问题：如何隔离变化、如何替换实现、如何扩展行为，以及如何控制对象之间的依赖。
+
+Go 当然也需要解决这些问题。不过，Go 没有传统的类继承体系，接口又是隐式实现的，因此很多经典模式到了 Go 里会变得更轻。一个小接口、一个函数类型，甚至一个闭包，往往就足以表达原本需要多个抽象类才能完成的设计。
+
+这篇文章不会机械地列出全部 23 种 GoF 设计模式，而是挑选 Go 项目里最常见、最有工程价值的模式，并回答三个问题：
+
+- 它解决什么问题？
+- 在 Go 中怎样自然地实现？
+- 什么时候不应该使用它？
+
+## 先理解 Go 如何影响设计模式
+
+在进入具体模式之前，需要先建立几个 Go 风格的设计原则。
+
+### 接口由使用方定义
+
+Go 的类型不需要显式声明“实现了某个接口”。只要方法集合匹配，它就自动满足接口。
+
+```go
+type Store interface {
+    Get(key string) ([]byte, error)
+}
+```
+
+这意味着接口通常应该在需要它的一方定义。调用方只描述自己真正需要的能力，实现方不必提前设计一个庞大的继承体系。
+
+接口越小，适配现有类型、编写测试替身和替换实现就越容易。Go 标准库中的 `io.Reader` 只有一个 `Read` 方法，却可以连接文件、网络、压缩、加密和内存缓冲区等大量组件。
+
+### 优先使用组合
+
+Go 没有类继承，但支持结构体嵌入和接口组合。与其通过继承建立深层类型树，Go 代码通常把较小的行为组合成更完整的能力。
+
+```go
+type ReadWriter interface {
+    io.Reader
+    io.Writer
+}
+```
+
+组合让依赖更明确，也避免了父类修改意外影响整个继承链的问题。
+
+### 函数也是一种实现
+
+如果一种策略只有一个行为，不一定要专门定义结构体。函数类型同样可以实现接口：
+
+```go
+type Handler interface {
+    Handle(string) error
+}
+
+type HandlerFunc func(string) error
+
+func (f HandlerFunc) Handle(value string) error {
+    return f(value)
+}
+```
+
+`http.HandlerFunc` 就使用了这种技巧。它把普通函数适配成 `http.Handler`，让调用者可以在接口和函数之间自由选择。
+
+### 模式不是目标
+
+设计模式会增加抽象层。只有当变化确实存在、代码确实需要替换或扩展时，抽象才会带来收益。
+
+如果一个 `switch` 已经清晰地解决了问题，就没有必要为了“使用状态模式”而拆出五个类型。如果一个构造函数只有两个参数，也没有必要立即引入 Builder。好的设计不是模式越多越好，而是让变化停留在尽可能小的范围内。
+
+## 创建型模式
+
+创建型模式关注对象怎样被创建。它们通常用于隐藏构造细节、选择具体实现，或者管理复杂配置。
+
+## 工厂模式：把创建逻辑集中起来
+
+假设一个通知服务支持邮件和短信。业务代码只关心“发送通知”，不应该到处判断并创建具体客户端。
+
+```go
+package notification
+
+import "fmt"
+
+type Sender interface {
+    Send(to, message string) error
+}
+
+type EmailSender struct{}
+
+func (EmailSender) Send(to, message string) error {
+    fmt.Printf("send email to %s: %s\n", to, message)
+    return nil
+}
+
+type SMSSender struct{}
+
+func (SMSSender) Send(to, message string) error {
+    fmt.Printf("send sms to %s: %s\n", to, message)
+    return nil
+}
+
+func NewSender(channel string) (Sender, error) {
+    switch channel {
+    case "email":
+        return EmailSender{}, nil
+    case "sms":
+        return SMSSender{}, nil
+    default:
+        return nil, fmt.Errorf("unsupported channel: %s", channel)
+    }
+}
+```
+
+调用方只依赖 `Sender`：
+
+```go
+sender, err := notification.NewSender(config.Channel)
+if err != nil {
+    return err
+}
+
+return sender.Send(user.Contact, "Your order has shipped")
+```
+
+工厂的主要价值是把“选择哪个实现”和“怎样初始化它”集中到一个位置。它适合数据库驱动、存储后端、支付渠道、日志组件等需要根据配置切换实现的场景。
+
+但如果创建过程只是 `&User{}`，工厂函数不会自动让代码更好。Go 里常见的 `NewXxx` 函数不一定都是设计模式意义上的工厂；只有当它封装了重要约束或隐藏了具体实现时，这层抽象才真正有价值。
+
+## Functional Options：Go 风格的建造者模式
+
+当一个对象的可选参数越来越多时，直接扩展构造函数会变得难以阅读：
+
+```go
+client := NewClient(
+    "https://api.example.com",
+    3*time.Second,
+    5,
+    true,
+    logger,
+)
+```
+
+调用处无法直接看出每个值的含义，后续新增参数还会破坏已有调用。传统面向对象语言常用 Builder 解决这个问题，而 Go 更常使用 Functional Options。
+
+```go
+type Client struct {
+    baseURL    string
+    timeout    time.Duration
+    maxRetries int
+    logger     *slog.Logger
+}
+
+type Option func(*Client)
+
+func WithTimeout(timeout time.Duration) Option {
+    return func(client *Client) {
+        client.timeout = timeout
+    }
+}
+
+func WithMaxRetries(maxRetries int) Option {
+    return func(client *Client) {
+        client.maxRetries = maxRetries
+    }
+}
+
+func WithLogger(logger *slog.Logger) Option {
+    return func(client *Client) {
+        client.logger = logger
+    }
+}
+
+func NewClient(baseURL string, options ...Option) *Client {
+    client := &Client{
+        baseURL:    baseURL,
+        timeout:    5 * time.Second,
+        maxRetries: 3,
+        logger:     slog.Default(),
+    }
+
+    for _, option := range options {
+        option(client)
+    }
+
+    return client
+}
+```
+
+调用时，每个配置项的含义都很清楚：
+
+```go
+client := NewClient(
+    "https://api.example.com",
+    WithTimeout(2*time.Second),
+    WithMaxRetries(5),
+)
+```
+
+Functional Options 的优点包括：
+
+- 可选参数有明确名称
+- 可以提供合理的默认值
+- 新增选项通常不破坏现有调用
+- 选项可以复用或组合
+
+如果选项本身可能无效，可以让 `Option` 返回错误：
+
+```go
+type Option func(*Client) error
+
+func WithTimeout(timeout time.Duration) Option {
+    return func(client *Client) error {
+        if timeout <= 0 {
+            return fmt.Errorf("timeout must be positive")
+        }
+        client.timeout = timeout
+        return nil
+    }
+}
+```
+
+不过，当参数很少且全部必填时，普通构造函数更直接。Functional Options 适合配置较多、可选项经常扩展的公共 API，而不是所有结构体的默认写法。
+
+## 单例模式：控制初始化，而不是制造全局变量
+
+Go 中可以使用 `sync.Once` 保证初始化逻辑只执行一次：
+
+```go
+var (
+    instance *Client
+    once     sync.Once
+)
+
+func DefaultClient() *Client {
+    once.Do(func() {
+        instance = NewClient("https://api.example.com")
+    })
+    return instance
+}
+```
+
+即使多个 goroutine 同时调用 `DefaultClient`，初始化函数也只会执行一次。
+
+单例适合初始化成本较高、进程内确实只需要一份的资源，例如只读元数据或默认注册表。但它很容易退化成全局可变状态，带来几个问题：
+
+- 依赖隐藏在函数内部
+- 测试之间可能相互影响
+- 无法轻松替换实现
+- 初始化和释放时机不清晰
+
+在业务代码中，通常更推荐在 `main` 中创建依赖，再显式传给需要它的服务：
+
+```go
+client := NewClient(config.BaseURL)
+service := NewOrderService(client)
+```
+
+`sync.Once` 是并发安全的初始化工具，但不意味着所有资源都应该设计成单例。
+
+## 结构型模式
+
+结构型模式关注如何连接类型和对象，让已有组件在不大幅修改的情况下协同工作。
+
+## 适配器模式：让已有类型满足目标接口
+
+假设业务层依赖自己的短信接口：
+
+```go
+type SMS interface {
+    Send(phone, message string) error
+}
+```
+
+第三方 SDK 提供的 API 却完全不同：
+
+```go
+type VendorClient struct{}
+
+func (VendorClient) Push(payload VendorPayload) error {
+    // 调用第三方服务
+    return nil
+}
+```
+
+适配器负责翻译两边的协议：
+
+```go
+type VendorSMSAdapter struct {
+    client VendorClient
+}
+
+func (adapter VendorSMSAdapter) Send(phone, message string) error {
+    return adapter.client.Push(VendorPayload{
+        Mobile:  phone,
+        Content: message,
+    })
+}
+```
+
+业务层不需要知道 `VendorPayload`，第三方 SDK 也不需要为了你的项目修改。将来切换供应商时，只需实现新的适配器。
+
+Go 的隐式接口让适配器尤其轻量：实现方不需要引用接口所在的包，只要方法匹配即可。适配器常用于第三方 SDK、旧系统迁移、数据格式转换和基础设施接口统一。
+
+适配器的职责应该是协议转换。如果它开始包含定价、订单状态等大量业务规则，说明边界可能放错了。
+
+## 装饰器模式：在外层叠加能力
+
+装饰器在不修改原实现的情况下增强行为。下面先定义一个简单的查询接口：
+
+```go
+type UserRepository interface {
+    Find(ctx context.Context, id int64) (*User, error)
+}
+```
+
+给它增加日志能力：
+
+```go
+type LoggingRepository struct {
+    next   UserRepository
+    logger *slog.Logger
+}
+
+func (repository LoggingRepository) Find(
+    ctx context.Context,
+    id int64,
+) (*User, error) {
+    startedAt := time.Now()
+    user, err := repository.next.Find(ctx, id)
+
+    repository.logger.InfoContext(
+        ctx,
+        "find user",
+        "id", id,
+        "duration", time.Since(startedAt),
+        "error", err,
+    )
+
+    return user, err
+}
+```
+
+装饰器可以继续嵌套：
+
+```go
+repository := NewPostgresUserRepository(db)
+repositoryWithLogs := LoggingRepository{
+    next:   repository,
+    logger: logger,
+}
+repositoryWithCache := CachingRepository{
+    next:  repositoryWithLogs,
+    cache: cache,
+}
+```
+
+日志、缓存、指标、重试和链路追踪都是典型的横切能力，适合通过装饰器附加。
+
+Go 的 HTTP 中间件也是装饰器的经典例子：
+
+```go
+type Middleware func(http.Handler) http.Handler
+
+func WithRequestLog(logger *slog.Logger) Middleware {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(
+            writer http.ResponseWriter,
+            request *http.Request,
+        ) {
+            logger.Info("request", "path", request.URL.Path)
+            next.ServeHTTP(writer, request)
+        })
+    }
+}
+```
+
+装饰器和代理的结构很像，区别主要在意图：装饰器关注增加功能，代理关注控制访问，例如权限检查、延迟加载或远程调用。
+
+## 外观模式：给复杂子系统一个简单入口
+
+创建订单可能需要库存、支付、订单存储和通知等多个组件。让 API 层直接编排所有细节，会导致流程散落在各处。
+
+```go
+type CheckoutService struct {
+    inventory InventoryService
+    payment   PaymentService
+    orders    OrderRepository
+    notifier  Notifier
+}
+
+func (service *CheckoutService) Checkout(
+    ctx context.Context,
+    command CheckoutCommand,
+) (*Order, error) {
+    if err := service.inventory.Reserve(ctx, command.Items); err != nil {
+        return nil, err
+    }
+
+    payment, err := service.payment.Charge(ctx, command.Payment)
+    if err != nil {
+        return nil, err
+    }
+
+    order, err := service.orders.Create(ctx, command, payment)
+    if err != nil {
+        return nil, err
+    }
+
+    _ = service.notifier.OrderCreated(ctx, order)
+    return order, nil
+}
+```
+
+`CheckoutService` 为上层提供了一个稳定、易懂的入口，并隐藏子系统之间的协作细节。
+
+外观并不意味着把所有业务都塞进一个巨大服务。一个外观应该围绕明确的用例或业务流程，而不是成为接收所有依赖的“上帝对象”。
+
+## 组合模式：统一处理单个对象和对象集合
+
+组合模式适合树形结构。文件和目录、菜单、组织架构、规则树都可以把叶子节点与组合节点抽象成相同接口。
+
+下面用规则校验举例：
+
+```go
+type Rule interface {
+    Validate(value string) error
+}
+
+type RequiredRule struct{}
+
+func (RequiredRule) Validate(value string) error {
+    if value == "" {
+        return errors.New("value is required")
+    }
+    return nil
+}
+
+type AllRules []Rule
+
+func (rules AllRules) Validate(value string) error {
+    for _, rule := range rules {
+        if err := rule.Validate(value); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+
+`RequiredRule` 是叶子节点，`AllRules` 是组合节点，但调用方都通过 `Rule` 使用它们：
+
+```go
+var usernameRule Rule = AllRules{
+    RequiredRule{},
+    MinLengthRule{Length: 3},
+    MaxLengthRule{Length: 20},
+}
+```
+
+当业务天然是树形结构，而且调用方希望统一处理叶子与组合时，这种模式很有价值。如果数据只是普通列表，则没有必要额外抽象成树。
+
+## 行为型模式
+
+行为型模式关注对象如何协作，以及一个行为怎样被选择、组合或传递。
+
+## 策略模式：替换一段算法
+
+电商系统可能根据用户类型使用不同的价格计算方式。最直接的方式是在函数里写多个条件分支，但当算法不断增加时，主流程会越来越难维护。
+
+Go 中可以直接用函数类型表示策略：
+
+```go
+type DiscountStrategy func(total int64) int64
+
+func NoDiscount(total int64) int64 {
+    return total
+}
+
+func PercentageDiscount(percent int64) DiscountStrategy {
+    return func(total int64) int64 {
+        return total * (100 - percent) / 100
+    }
+}
+
+func CalculatePrice(
+    items []Item,
+    discount DiscountStrategy,
+) int64 {
+    var total int64
+    for _, item := range items {
+        total += item.Price * int64(item.Quantity)
+    }
+    return discount(total)
+}
+```
+
+使用时把算法传进去：
+
+```go
+price := CalculatePrice(items, PercentageDiscount(20))
+```
+
+如果策略需要多个方法或持有复杂状态，可以改用接口：
+
+```go
+type RetryStrategy interface {
+    NextDelay(attempt int) (time.Duration, bool)
+}
+```
+
+策略模式适合算法会独立变化、需要运行时切换，或者需要分别测试的场景。只有两三个稳定分支时，`switch` 可能更加直观。
+
+## 模板方法：固定流程，开放部分步骤
+
+经典模板方法依赖继承：父类定义流程，子类覆盖其中的步骤。Go 没有继承，通常使用组合或回调表达同样的意图。
+
+```go
+type Importer struct {
+    Decode   func(io.Reader) ([]Record, error)
+    Validate func(Record) error
+    Save     func(context.Context, []Record) error
+}
+
+func (importer Importer) Import(
+    ctx context.Context,
+    reader io.Reader,
+) error {
+    records, err := importer.Decode(reader)
+    if err != nil {
+        return fmt.Errorf("decode: %w", err)
+    }
+
+    for _, record := range records {
+        if err := importer.Validate(record); err != nil {
+            return fmt.Errorf("validate: %w", err)
+        }
+    }
+
+    if err := importer.Save(ctx, records); err != nil {
+        return fmt.Errorf("save: %w", err)
+    }
+
+    return nil
+}
+```
+
+`Import` 固定了解析、校验、保存的整体顺序，而具体步骤可以替换。
+
+模板方法与策略模式的区别在于：模板方法固定整体流程，只开放部分步骤；策略模式通常替换一整段算法。如果回调数量越来越多，最好把各阶段整理成小接口，避免出现难以理解的函数配置对象。
+
+## 责任链模式：让请求依次经过多个节点
+
+HTTP 中间件是 Go 项目里最常见的责任链。每个节点都可以处理请求、把请求交给下一个节点，或者提前终止。
+
+```go
+func RequireAPIKey(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(
+        writer http.ResponseWriter,
+        request *http.Request,
+    ) {
+        if request.Header.Get("X-API-Key") == "" {
+            http.Error(writer, "unauthorized", http.StatusUnauthorized)
+            return
+        }
+
+        next.ServeHTTP(writer, request)
+    })
+}
+
+func LimitBody(maxBytes int64) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(
+            writer http.ResponseWriter,
+            request *http.Request,
+        ) {
+            request.Body = http.MaxBytesReader(
+                writer,
+                request.Body,
+                maxBytes,
+            )
+            next.ServeHTTP(writer, request)
+        })
+    }
+}
+```
+
+再把多个中间件组装起来：
+
+```go
+func Chain(
+    handler http.Handler,
+    middlewares ...func(http.Handler) http.Handler,
+) http.Handler {
+    for index := len(middlewares) - 1; index >= 0; index-- {
+        handler = middlewares[index](handler)
+    }
+    return handler
+}
+
+handler := Chain(
+    orderHandler,
+    WithRequestLog(logger),
+    RequireAPIKey,
+    LimitBody(1<<20),
+)
+```
+
+责任链的关键是顺序和短路。日志中间件放在鉴权外层还是内层，会决定未授权请求是否被记录；某个节点不调用 `next`，后续节点就不会执行。
+
+这种模式适合鉴权、限流、校验、日志等相互独立的处理步骤。如果节点之间高度依赖共享状态，显式的业务流程通常比一条隐蔽的链更容易理解。
+
+## 观察者模式：把状态变化通知给多个订阅者
+
+当订单创建后，系统可能需要发邮件、记录审计日志、更新统计。订单服务不应该直接依赖所有后续动作，可以发布事件，由多个观察者订阅。
+
+同步版本可以很简单：
+
+```go
+type OrderCreated struct {
+    OrderID int64
+    UserID  int64
+}
+
+type OrderCreatedHandler func(
+    context.Context,
+    OrderCreated,
+) error
+
+type OrderEvents struct {
+    handlers []OrderCreatedHandler
+}
+
+func (events *OrderEvents) Subscribe(handler OrderCreatedHandler) {
+    events.handlers = append(events.handlers, handler)
+}
+
+func (events *OrderEvents) Publish(
+    ctx context.Context,
+    event OrderCreated,
+) error {
+    for _, handler := range events.handlers {
+        if err := handler(ctx, event); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+
+这个实现易于理解，但所有处理器会顺序执行，一个处理器失败会中断后续处理。改成 goroutine 或 channel 可以异步通知，却同时引入更多问题：
+
+- 发布者是否需要等待结果？
+- 慢消费者会不会阻塞整个系统？
+- 缓冲区满了以后丢弃、阻塞还是降级？
+- 处理失败怎样重试？
+- 订阅怎样取消，channel 由谁关闭？
+- 进程退出时怎样完成剩余事件？
+
+如果事件必须可靠送达，仅靠进程内 channel 通常不够，应该考虑带持久化和重试能力的消息系统。观察者模式降低了发布者与订阅者的耦合，但并没有消除一致性和错误处理问题。
+
+## 命令模式：把一次操作封装成值
+
+命令模式把“要做的事”表示成可以存储、排队、重试和记录的对象。
+
+```go
+type Command interface {
+    Execute(context.Context) error
+}
+
+type SendWelcomeEmail struct {
+    UserID int64
+    mailer Mailer
+}
+
+func (command SendWelcomeEmail) Execute(ctx context.Context) error {
+    return command.mailer.SendWelcome(ctx, command.UserID)
+}
+```
+
+任务队列只需要依赖 `Command`：
+
+```go
+type Worker struct {
+    jobs <-chan Command
+}
+
+func (worker Worker) Run(ctx context.Context) error {
+    for {
+        select {
+        case <-ctx.Done():
+            return ctx.Err()
+        case command, ok := <-worker.jobs:
+            if !ok {
+                return nil
+            }
+            if err := command.Execute(ctx); err != nil {
+                return err
+            }
+        }
+    }
+}
+```
+
+如果命令只在内存中临时执行，一个函数类型可能已经足够：
+
+```go
+type CommandFunc func(context.Context) error
+
+func (command CommandFunc) Execute(ctx context.Context) error {
+    return command(ctx)
+}
+```
+
+当命令需要持久化到队列时，结构体通常更合适，因为命令名称和参数可以被序列化，而闭包不能可靠地跨进程保存。
+
+## 状态模式：让行为随状态变化
+
+订单状态较少时，一个 `switch` 很清楚：
+
+```go
+switch order.Status {
+case StatusPending:
+    // ...
+case StatusPaid:
+    // ...
+}
+```
+
+当每个状态拥有大量不同操作，而且状态转换规则不断增加时，可以把行为拆到状态对象中。
+
+```go
+type OrderState interface {
+    Pay(*Order) error
+    Cancel(*Order) error
+    Name() string
+}
+
+type PendingState struct{}
+
+func (PendingState) Pay(order *Order) error {
+    order.state = PaidState{}
+    return nil
+}
+
+func (PendingState) Cancel(order *Order) error {
+    order.state = CanceledState{}
+    return nil
+}
+
+func (PendingState) Name() string {
+    return "pending"
+}
+
+type PaidState struct{}
+
+func (PaidState) Pay(*Order) error {
+    return errors.New("order is already paid")
+}
+
+func (PaidState) Cancel(*Order) error {
+    return errors.New("paid order cannot be canceled directly")
+}
+
+func (PaidState) Name() string {
+    return "paid"
+}
+
+type Order struct {
+    state OrderState
+}
+
+func (order *Order) Pay() error {
+    return order.state.Pay(order)
+}
+```
+
+状态模式把每种状态的允许操作和转换规则放在一起，避免一个巨大 `switch` 分散在多个方法中。
+
+它的代价是类型数量增加，而且状态持久化时需要在数据库中的状态值与 Go 对象之间转换。如果状态少、规则稳定，显式的枚举和 `switch` 往往更简单。
+
+## Go 中常见的并发模式
+
+并发模式不属于经典 GoF 设计模式，但它们在 Go 工程中非常重要。Go 的 goroutine、channel 和 `context` 让任务协作可以直接体现在代码结构中。
+
+## Worker Pool：限制并发数量
+
+如果要处理一万个任务，为每个任务都无限制地创建 goroutine，可能压垮数据库或下游服务。Worker Pool 使用固定数量的 worker 消费任务，从而提供并发上限。
+
+```go
+type Job struct {
+    ID int64
+}
+
+func worker(
+    ctx context.Context,
+    jobs <-chan Job,
+    results chan<- error,
+) {
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case job, ok := <-jobs:
+            if !ok {
+                return
+            }
+            results <- process(ctx, job)
+        }
+    }
+}
+
+func run(ctx context.Context, input []Job, workerCount int) error {
+    jobs := make(chan Job)
+    results := make(chan error)
+
+    var waitGroup sync.WaitGroup
+    for range workerCount {
+        waitGroup.Add(1)
+        go func() {
+            defer waitGroup.Done()
+            worker(ctx, jobs, results)
+        }()
+    }
+
+    go func() {
+        defer close(jobs)
+        for _, job := range input {
+            select {
+            case <-ctx.Done():
+                return
+            case jobs <- job:
+            }
+        }
+    }()
+
+    go func() {
+        waitGroup.Wait()
+        close(results)
+    }()
+
+    for err := range results {
+        if err != nil {
+            return err
+        }
+    }
+    return ctx.Err()
+}
+```
+
+真实项目还需要明确错误策略：遇到第一个错误是否取消其他任务、是否收集全部错误、失败任务是否重试。Worker Pool 的重点不是 channel 的写法，而是为系统建立背压，避免生产速度无限超过消费能力。
+
+## Pipeline：把处理过程拆成多个阶段
+
+Pipeline 让数据依次经过若干处理阶段，每个阶段读取上游 channel，再向下游输出。
+
+```go
+func generate(ctx context.Context, numbers ...int) <-chan int {
+    output := make(chan int)
+    go func() {
+        defer close(output)
+        for _, number := range numbers {
+            select {
+            case <-ctx.Done():
+                return
+            case output <- number:
+            }
+        }
+    }()
+    return output
+}
+
+func square(ctx context.Context, input <-chan int) <-chan int {
+    output := make(chan int)
+    go func() {
+        defer close(output)
+        for number := range input {
+            select {
+            case <-ctx.Done():
+                return
+            case output <- number * number:
+            }
+        }
+    }()
+    return output
+}
+```
+
+组装后，数据流向很清晰：
+
+```go
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
+
+numbers := generate(ctx, 1, 2, 3, 4)
+squares := square(ctx, numbers)
+
+for value := range squares {
+    fmt.Println(value)
+}
+```
+
+Pipeline 适合流式处理、批量转换和多阶段 I/O。每个阶段都要正确响应取消并关闭自己创建的输出 channel，否则很容易造成 goroutine 泄漏。
+
+## Fan-out 与 Fan-in
+
+当某个阶段耗时较长时，可以让多个 goroutine 同时读取同一个输入 channel，这叫 Fan-out；再把多个输出合并到一个 channel，这叫 Fan-in。
+
+这种模式可以提升独立任务的吞吐量，但需要注意：
+
+- 输出顺序通常不再稳定
+- 并发数应该有明确上限
+- 所有发送和接收都应该能响应取消
+- 合并方必须等所有输入结束后再关闭输出
+
+如果业务要求保持顺序，可以给每个任务附带序号，在结果阶段重新排序；这也意味着额外内存和等待成本。
+
+## 从标准库中理解设计模式
+
+Go 标准库很少在 API 名称里直接写出模式名称，却广泛使用了这些思想。
+
+| 标准库设计 | 可以看到的模式 |
+| --- | --- |
+| `io.Reader`、`io.Writer` | 小接口、适配器、装饰器 |
+| `http.HandlerFunc` | 函数适配器 |
+| HTTP middleware | 装饰器、责任链 |
+| `http.RoundTripper` | 策略、装饰器 |
+| `sort.Interface` | 策略 |
+| `database/sql` 驱动体系 | 工厂、适配器 |
+| `sync.Once` | 并发安全的一次性初始化 |
+| `context.Context` | 取消和截止时间的链式传播 |
+
+例如，自定义 `http.RoundTripper` 可以在不修改调用代码的情况下为所有请求增加认证：
+
+```go
+type AuthTransport struct {
+    Token string
+    Next  http.RoundTripper
+}
+
+func (transport AuthTransport) RoundTrip(
+    request *http.Request,
+) (*http.Response, error) {
+    cloned := request.Clone(request.Context())
+    cloned.Header.Set("Authorization", "Bearer "+transport.Token)
+
+    next := transport.Next
+    if next == nil {
+        next = http.DefaultTransport
+    }
+    return next.RoundTrip(cloned)
+}
+```
+
+这里既有适配统一接口的思想，也有在原传输层外增加能力的装饰器思想。实际代码不需要执着于给它贴上唯一标签，重要的是理解依赖如何被隔离，以及行为怎样被组合。
+
+## 怎样选择合适的模式
+
+遇到设计问题时，可以先根据“正在变化的东西”进行判断：
+
+| 问题 | 可以考虑 |
+| --- | --- |
+| 需要根据配置创建不同实现 | 工厂 |
+| 构造参数多，且大部分可选 | Functional Options |
+| 现有类型不满足目标接口 | 适配器 |
+| 需要叠加日志、缓存、重试等能力 | 装饰器 |
+| 需要隐藏多个子系统的协作流程 | 外观 |
+| 需要替换一段算法 | 策略 |
+| 请求需要依次经过多个可短路步骤 | 责任链 |
+| 一个事件需要通知多个处理方 | 观察者 |
+| 操作需要排队、记录或重试 | 命令 |
+| 行为主要由当前状态决定 | 状态 |
+| 需要限制任务并发量 | Worker Pool |
+| 数据需要经过多个流式阶段 | Pipeline |
+
+这张表只能作为起点。真正做决定之前，还应该继续问：
+
+1. 变化是否已经发生，还是只是假设未来可能发生？
+2. 一个函数、一个小接口或一个 `switch` 能否清晰解决？
+3. 引入模式后，调用方是否真的更简单？
+4. 新的抽象是否容易测试和替换？
+5. 团队成员能否快速理解控制流？
+
+## 常见误区
+
+### 用大接口模拟抽象基类
+
+为了“面向接口编程”而提前定义十几个方法的大接口，会迫使所有实现承担不需要的能力。更好的方式是从调用方出发，定义最小接口。
+
+### 为每个结构体创建接口
+
+接口的价值在于表达调用方需要的行为，而不是为具体类型再复制一遍方法列表。如果一个类型没有替换、隔离或测试需求，直接使用具体类型完全合理。
+
+### 过早为未来设计
+
+在第二种实现出现之前，很难知道真正稳定的抽象边界。先完成清晰的具体实现，再根据实际变化提取模式，通常比一开始建立复杂框架更可靠。
+
+### 忽略并发模式的退出路径
+
+启动 goroutine 很容易，正确停止它更重要。每个并发组件都应该回答：
+
+- 谁关闭 channel？
+- 谁等待 goroutine？
+- 取消信号从哪里来？
+- 错误怎样返回？
+- 慢消费者会发生什么？
+
+无法回答这些问题的并发抽象，即使看起来很优雅，也可能在生产环境中泄漏资源。
+
+### 只讨论优点，不讨论代价
+
+每种模式都用额外结构换取某种灵活性。工厂隐藏创建细节，也隐藏了具体类型；装饰器方便组合，也可能让调用链难以追踪；观察者降低直接依赖，也让错误传播和执行顺序更复杂。
+
+模式适合解决重复出现的结构性问题，不是免费的最佳实践。
+
+## 总结
+
+Go 中的设计模式往往没有传统面向对象实现那么显眼。工厂可能只是一个返回接口的函数，策略可能只是一个函数参数，适配器可能只是拥有一个方法的小结构体，责任链可能就是一组 HTTP 中间件。
+
+真正值得掌握的不是这些名称，而是名称背后的设计目的：
+
+- 用小接口隔离依赖
+- 用组合叠加能力
+- 用函数表达单一行为
+- 把变化限制在局部
+- 为并发任务设计清晰的生命周期
+
+先写最简单、可读的代码。当创建逻辑、算法、外部协议或业务状态开始独立变化时，再选择合适的模式提取它们。好的 Go 设计通常不会让人感叹“这里用了很多模式”，而是让人觉得依赖清晰、控制流自然，而且修改起来没有意外。
