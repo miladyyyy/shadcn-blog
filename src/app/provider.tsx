@@ -2,9 +2,9 @@
 
 import { ProgressProvider } from '@bprogress/next/app'
 import { TooltipProvider } from '@radix-ui/react-tooltip'
+import { Analytics } from '@vercel/analytics/next'
 import { NuqsAdapter } from 'nuqs/adapters/next/app'
 import type { ReactNode } from 'react'
-import Analytics from '@/components/analytics'
 import { TailwindIndicator } from '@/components/tailwind-indicator'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
