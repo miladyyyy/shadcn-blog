@@ -42,7 +42,7 @@ export default async function Page(props: {
                   items={toc}
                 />
               ) : null}
-              <div className='prose min-w-0 flex-1 px-4'>
+              <div className='prose min-w-0 flex-1 p-4'>
                 <Mdx
                   components={{
                     ...defaultMdxComponents,
