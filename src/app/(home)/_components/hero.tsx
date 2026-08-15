@@ -1,38 +1,21 @@
-import * as motion from 'motion/react-client'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Icons } from '@/components/icons/icons'
+import PixelCard from '@/components/pixel-card'
 import { Section } from '@/components/section'
 import { buttonVariants } from '@/components/ui/button'
 import { ViewAnimation } from '@/components/view-animation'
 import Balancer from '@/components/wrap-balancer'
 import { cn } from '@/lib/utils'
 import avatarImage from '../../../../public/images/avatar.png'
-import heroImage from '../../../../public/images/gradient-noise-purple-azure-light.png'
 
 const Hero = () => {
   return (
-    <Section className='relative flex flex-col items-center justify-center gap-6 overflow-hidden bg-dashed px-4 py-16 sm:px-16 sm:py-24 md:py-32'>
-      <motion.div
-        animate={{ opacity: 1 }}
-        className='absolute inset-0 -z-10 h-full w-full'
-        initial={{ opacity: 0 }}
-        transition={{
-          duration: 0.4,
-          scale: { type: 'spring', visualDuration: 0.4, bounce: 0.5 },
-        }}
-        viewport={{ once: true }}
-        whileInView={{ opacity: 1 }}
-      >
-        <Image
-          alt='Hero Background'
-          className='pointer-events-none absolute right-0 bottom-0 h-225 w-251 max-w-251 translate-x-1/2 translate-y-1/2 select-none opacity-80 dark:opacity-100'
-          height={600}
-          priority
-          src={heroImage}
-          width={704}
-        />
-      </motion.div>
+    <Section className='relative isolate flex flex-col items-center justify-center gap-6 overflow-hidden bg-background px-4 py-16 sm:px-16 sm:py-24 md:py-32'>
+      <PixelCard
+        className='pointer-events-none absolute inset-0 z-0 opacity-90 dark:opacity-35'
+        colors='#B4B4B4'
+      />
 
       {/* <ViewAnimation
         delay={0.05}
@@ -48,6 +31,7 @@ const Hero = () => {
       </ViewAnimation> */}
 
       <ViewAnimation
+        className='relative z-10'
         delay={0.1}
         initial={{ opacity: 0, translateY: -6 }}
         whileInView={{ opacity: 1, translateY: 0 }}
@@ -62,6 +46,7 @@ const Hero = () => {
       </ViewAnimation>
 
       <ViewAnimation
+        className='relative z-10'
         delay={0.15}
         initial={{ opacity: 0, translateY: -6 }}
         whileInView={{ opacity: 1, translateY: 0 }}
@@ -74,6 +59,7 @@ const Hero = () => {
       </ViewAnimation>
 
       <ViewAnimation
+        className='relative z-10'
         delay={0.2}
         initial={{ opacity: 0, translateY: -6 }}
         whileInView={{ opacity: 1, translateY: 0 }}
